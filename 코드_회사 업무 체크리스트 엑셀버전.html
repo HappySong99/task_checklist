@@ -1,0 +1,938 @@
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { 
+  CheckCircle2, 
+  Circle, 
+  Plus, 
+  Trash2, 
+  Briefcase, 
+  BarChart3,
+  AlertCircle,
+  FileText,
+  Search,
+  Edit2,
+  Save,
+  X,
+  AlertTriangle,
+  Clock,
+  Download,
+  Archive,
+  List,
+  CheckSquare,
+  TrendingUp,
+  Settings,
+  History,
+  ArrowRightCircle,
+  Eye,
+  MessageSquare,
+  Layers,
+  FileJson,
+  Copy,
+  Hash,
+  Bookmark,
+  Moon,
+  Sun,
+  Check,
+  ChevronUp,
+  ChevronRight,
+  RefreshCw,
+  Filter,
+  CalendarRange,
+  ClipboardList,
+  Repeat,
+  Undo2,
+  Redo2,
+  User,
+  ExternalLink,
+  Timer,
+  Play,
+  LayoutGrid,
+  Kanban,
+  Calendar,
+  Bell,
+  Grid,
+  Upload
+} from 'lucide-react';
+
+export default function App() {
+  // --- 테마 관리 (Light, Dark, Excel) ---
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('businessTasks_theme_v2');
+    return saved || 'light';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('businessTasks_theme_v2', theme);
+    const root = document.documentElement;
+    root.classList.remove('dark', 'excel-theme');
+    if (theme === 'dark') root.classList.add('dark');
+    if (theme === 'excel') root.classList.add('excel-theme');
+  }, [theme]);
+
+  // 테마별 스타일 헬퍼
+  const getThemeStyles = () => {
+    switch (theme) {
+      case 'dark':
+        return {
+          bg: 'bg-slate-900 text-slate-100',
+          header: 'bg-slate-800 border-slate-700',
+          card: 'bg-slate-800 border-slate-700',
+          input: 'bg-slate-700 border-slate-600 text-white',
+          buttonPrimary: 'bg-indigo-600 hover:bg-indigo-700 text-white',
+          buttonSecondary: 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600',
+          accent: 'text-indigo-400',
+          muted: 'text-slate-400',
+          border: 'border-slate-700'
+        };
+      case 'excel':
+        return {
+          bg: 'bg-gray-100 text-gray-900 font-mono',
+          header: 'bg-[#107C41] border-[#107C41] text-white shadow-md rounded-none',
+          card: 'bg-white border-gray-300 rounded-none shadow-sm',
+          input: 'bg-white border-gray-400 text-gray-900 rounded-none focus:ring-[#107C41]',
+          buttonPrimary: 'bg-[#107C41] hover:bg-[#0c5d31] text-white rounded-none',
+          buttonSecondary: 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 rounded-none',
+          accent: 'text-[#107C41]',
+          muted: 'text-gray-500',
+          border: 'border-gray-300'
+        };
+      default: // light
+        return {
+          bg: 'bg-slate-100 text-slate-800',
+          header: 'bg-white border-slate-200',
+          card: 'bg-white border-slate-200',
+          input: 'bg-white border-slate-300 text-slate-700',
+          buttonPrimary: 'bg-indigo-600 hover:bg-indigo-700 text-white',
+          buttonSecondary: 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50',
+          accent: 'text-indigo-600',
+          muted: 'text-slate-500',
+          border: 'border-slate-200'
+        };
+    }
+  };
+
+  const ts = getThemeStyles();
+
+  // --- Toast Notification ---
+  const [toasts, setToasts] = useState([]);
+  const showToast = (message, type = 'success') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000); 
+  };
+
+  // --- Data Management ---
+  const defaultCategories = ['보고', '저장품', '수선유지비', '소모품', '관리전환', '기타'];
+  const [categories, setCategories] = useState(() => JSON.parse(localStorage.getItem('businessTasks_categories')) || defaultCategories);
+  
+  const defaultTemplates = [
+    { id: 't1', title: '월간 비용 품의', text: '[월간] 00월 부서 운영비 품의', category: '소모품', priority: 'high', subtasks: [{text: '영수증 취합', done:false}, {text: 'ERP 입력', done:false}] },
+    { id: 't2', title: '주간 업무 보고', text: '[주간] 00월 0주차 업무 보고', category: '보고', priority: 'medium', subtasks: [] }
+  ];
+  const [templates, setTemplates] = useState(() => JSON.parse(localStorage.getItem('businessTasks_templates')) || defaultTemplates);
+
+  const getTodayString = () => new Date().toISOString().split('T')[0];
+
+  const initialTasks = [
+    { 
+      id: 1, 
+      text: '3분기 정기 소모품 구매', 
+      category: '소모품', 
+      priority: 'high', 
+      status: 'in_progress', 
+      startDate: '2024-06-20',
+      deadline: '2024-06-25',
+      completedAt: null,
+      tags: ['#정기구매', '#예산관리'],
+      subtasks: [
+        { id: 101, text: '부서별 수요조사', done: true, targetDate: '' },
+        { id: 102, text: '견적서 비교', done: false, targetDate: getTodayString() }, 
+        { id: 103, text: '품의 상신', done: false, targetDate: '' }
+      ],
+      comments: [
+        { id: 901, author: '관리자', text: '견적서 업체 3곳 이상 비교했나?', date: '2024-06-21 14:00' }
+      ],
+      notes: '팀장님 결재 대기 중',
+      isArchived: false,
+      recurrence: 'none'
+    }
+  ];
+
+  const [tasks, setTasks] = useState(() => {
+    const saved = localStorage.getItem('businessTasks_v18_6'); 
+    return saved ? JSON.parse(saved) : initialTasks;
+  });
+
+  const [logs, setLogs] = useState(() => JSON.parse(localStorage.getItem('businessTasks_logs')) || []);
+
+  // History Stack
+  const [history, setHistory] = useState([]);
+  const [future, setFuture] = useState([]); 
+
+  // 입력 폼 상태
+  const [newTask, setNewTask] = useState('');
+  const [category, setCategory] = useState('보고'); 
+  const [priority, setPriority] = useState('medium');
+  const [startDate, setStartDate] = useState(getTodayString());
+  const [deadline, setDeadline] = useState('');
+  const [notes, setNotes] = useState('');
+  const [newTag, setNewTag] = useState(''); 
+  const [tags, setTags] = useState([]); 
+  const [recurrence, setRecurrence] = useState('none');
+  const [assignee, setAssignee] = useState(''); 
+  
+  const [newSubtaskText, setNewSubtaskText] = useState('');
+  const [editTagInput, setEditTagInput] = useState('');
+
+  // UI 제어 상태
+  const [filter, setFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all'); 
+  const [dateRangeFilter, setDateRangeFilter] = useState({ start: '', end: '' });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [errorMsg, setErrorMsg] = useState(''); 
+  const [viewMode, setViewMode] = useState('list'); 
+  const [groupBy, setGroupBy] = useState('none'); 
+  const [showSettings, setShowSettings] = useState(false); 
+  const [showLogs, setShowLogs] = useState(false); 
+  const [showDashboard, setShowDashboard] = useState(true); 
+  const [newCategory, setNewCategory] = useState(''); 
+  const [showTemplates, setShowTemplates] = useState(false); 
+  const [showArchived, setShowArchived] = useState(false); 
+  const [selectedTaskIds, setSelectedTaskIds] = useState([]); 
+  const [showReportModal, setShowReportModal] = useState(false); 
+  const [expandedTaskIds, setExpandedTaskIds] = useState([]);
+
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+
+  const fileInputRef = useRef(null);
+  const csvInputRef = useRef(null);
+  
+  // Edit States
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSubtaskText, setEditSubtaskText] = useState('');
+  const [editCommentText, setEditCommentText] = useState('');
+  const [editTagAddInput, setEditTagAddInput] = useState('');
+
+  // Persistence
+  useEffect(() => { localStorage.setItem('businessTasks_v18_6', JSON.stringify(tasks)); }, [tasks]);
+  useEffect(() => { localStorage.setItem('businessTasks_categories', JSON.stringify(categories)); }, [categories]);
+  useEffect(() => { localStorage.setItem('businessTasks_logs', JSON.stringify(logs)); }, [logs]);
+  useEffect(() => { localStorage.setItem('businessTasks_templates', JSON.stringify(templates)); }, [templates]);
+
+  // --- 당일 알림 로직 ---
+  useEffect(() => {
+    const today = getTodayString();
+    let alertCount = 0;
+    tasks.forEach(task => {
+      if (task.status === 'completed' || task.isArchived) return;
+      const dueSubtasks = task.subtasks?.filter(s => !s.done && s.targetDate === today) || [];
+      if (dueSubtasks.length > 0) {
+        dueSubtasks.forEach(sub => {
+          setTimeout(() => { showToast(`🔔 [오늘 예정] ${task.text} > ${sub.text}`, 'info'); }, alertCount * 500 + 1000);
+          alertCount++;
+        });
+      }
+    });
+  }, []); 
+
+  useEffect(() => { if (errorMsg) { const t = setTimeout(() => setErrorMsg(''), 3000); return () => clearTimeout(t); } }, [errorMsg]);
+
+  const addLog = (action, details) => {
+    setLogs(prev => [{id: Date.now(), timestamp: new Date().toLocaleString(), action, details}, ...prev].slice(0, 50)); 
+  };
+
+  // --- Undo/Redo Logic ---
+  const addToHistory = () => { setHistory(prev => { const newHistory = [...prev, tasks]; return newHistory.slice(-20); }); setFuture([]); };
+
+  const handleUndo = useCallback(() => {
+    if (history.length === 0) { showToast('되돌릴 작업이 없습니다.', 'error'); return; }
+    const previousTasks = history[history.length - 1];
+    setFuture(prev => [...prev, tasks]); setTasks(previousTasks); setHistory(prev => prev.slice(0, -1));
+    showToast('이전 상태로 되돌렸습니다.'); addLog('실행 취소', '이전 상태로 복구됨');
+  }, [history, tasks]);
+
+  const handleRedo = useCallback(() => {
+    if (future.length === 0) { showToast('다시 실행할 작업이 없습니다.', 'error'); return; }
+    const nextTasks = future[future.length - 1];
+    setHistory(prev => [...prev, tasks]); setTasks(nextTasks); setFuture(prev => prev.slice(0, -1));
+    showToast('작업을 다시 실행했습니다.'); addLog('다시 실행', '작업 복구됨');
+  }, [future, tasks]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => { if ((e.metaKey || e.ctrlKey)) { if (e.key === 'z') { e.preventDefault(); e.shiftKey ? handleRedo() : handleUndo(); } else if (e.key === 'y') { e.preventDefault(); handleRedo(); } } };
+    window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
+
+  // --- Confirmation Helper ---
+  const openConfirm = (title, message, onConfirmAction) => { setConfirmDialog({ isOpen: true, title, message, onConfirm: onConfirmAction }); };
+  const closeConfirm = () => { setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null }); };
+  const handleConfirmAction = () => { if (confirmDialog.onConfirm) confirmDialog.onConfirm(); closeConfirm(); };
+
+  // --- Helper: Next Action Text (Fixed ReferenceError) ---
+  const getNextAction = (task) => {
+    if (!task.subtasks || task.subtasks.length === 0) return null;
+    const nextSub = task.subtasks.find(s => !s.done);
+    if (!nextSub) return "모든 하위 업무 완료";
+    
+    if (nextSub.targetDate) {
+      const today = getTodayString();
+      const dateLabel = nextSub.targetDate === today ? '오늘' : nextSub.targetDate.substring(5); // MM-DD
+      return `${nextSub.text} (${dateLabel})`;
+    }
+    return nextSub.text;
+  };
+  
+  const toggleExpand = (id) => {
+    setExpandedTaskIds(prev => 
+      prev.includes(id) ? prev.filter(tid => tid !== id) : [...prev, id]
+    );
+  };
+
+  // --- Business Logic ---
+  const validateDates = (start, end) => {
+    if (start && end && new Date(start) > new Date(end)) { showToast('시작일자가 마감일보다 늦을 수 없습니다.', 'error'); return false; }
+    return true;
+  };
+  const setDatePreset = (type) => {
+    const today = new Date(); const s = today.toISOString().split('T')[0]; setStartDate(s); 
+    const t = new Date();
+    if(type==='week') t.setDate(t.getDate()+7);
+    if(type==='month') t.setMonth(t.getMonth()+1);
+    setDeadline(t.toISOString().split('T')[0]);
+  };
+  const getAutoSubtasks = (cat, baseId) => {
+    if (['저장품', '수선유지비', '소모품'].includes(cat)) {
+      return [{id:baseId+1, text:'계획보고', done:false, targetDate:''}, {id:baseId+2, text:'물품입고', done:false, targetDate:''}, {id:baseId+3, text:'검수및완료', done:false, targetDate:''}, {id:baseId+4, text:'대금지급', done:false, targetDate:''}];
+    } else if (cat === '관리전환') {
+      return [{id:baseId+1, text:'내용공유', done:false, targetDate:''}, {id:baseId+2, text:'물품입고', done:false, targetDate:''}];
+    }
+    return [];
+  };
+  const createRecurringTask = (originalTask) => {
+    const nextStart = new Date(originalTask.startDate); const nextDead = new Date(originalTask.deadline);
+    if (originalTask.recurrence === 'daily') { nextStart.setDate(nextStart.getDate()+1); nextDead.setDate(nextDead.getDate()+1); }
+    else if (originalTask.recurrence === 'weekly') { nextStart.setDate(nextStart.getDate()+7); nextDead.setDate(nextDead.getDate()+7); }
+    else if (originalTask.recurrence === 'monthly') { nextStart.setMonth(nextStart.getMonth()+1); nextDead.setMonth(nextDead.getMonth()+1); }
+    else return null;
+    const baseId = Date.now();
+    return { ...originalTask, id: baseId, status: 'in_progress', completedAt: null, isArchived: false, startDate: nextStart.toISOString().split('T')[0], deadline: nextDead.toISOString().split('T')[0], text: originalTask.text, subtasks: getAutoSubtasks(originalTask.category, baseId), comments: [] };
+  };
+
+  const changeStatus = (id, currentStatus) => {
+    addToHistory();
+    const nextStatus = currentStatus === 'in_progress' ? 'completed' : 'in_progress';
+    const nowStr = new Date().toISOString().split('T')[0];
+    let newTasks = tasks.map(t => t.id === id ? { ...t, status: nextStatus, completedAt: nextStatus === 'completed' ? nowStr : null } : t);
+    const targetTask = tasks.find(t => t.id === id);
+    if (nextStatus === 'completed' && targetTask && targetTask.recurrence !== 'none') {
+      const nextTask = createRecurringTask(targetTask);
+      if (nextTask) { newTasks = [nextTask, ...newTasks]; showToast(`반복 업무 생성: ${targetTask.recurrence}`); addLog('자동 생성', `반복 업무 "${nextTask.text}" 생성됨`); }
+    }
+    setTasks(newTasks);
+    addLog('상태 변경', `"${targetTask.text}": ${currentStatus} -> ${nextStatus}`);
+  };
+
+  const toggleSubtaskDirect = (taskId, subId) => {
+    addToHistory();
+    setTasks(tasks.map(task => {
+      if (task.id === taskId) {
+        return { ...task, subtasks: task.subtasks.map(s => s.id === subId ? { ...s, done: !s.done } : s) };
+      }
+      return task;
+    }));
+  };
+
+  // --- Bulk & Utils ---
+  const toggleSelectTask = (id) => setSelectedTaskIds(prev => prev.includes(id) ? prev.filter(tid => tid !== id) : [...prev, id]);
+  const toggleSelectAll = (filteredTasks) => setSelectedTaskIds(selectedTaskIds.length === filteredTasks.length && filteredTasks.length > 0 ? [] : filteredTasks.map(t => t.id));
+  const handleBulkStatusChange = (newStatus) => {
+    if (selectedTaskIds.length === 0) return;
+    addToHistory();
+    const nowStr = new Date().toISOString().split('T')[0];
+    setTasks(tasks.map(t => selectedTaskIds.includes(t.id) ? { ...t, status: newStatus, completedAt: newStatus === 'completed' ? nowStr : null } : t));
+    addLog('일괄 변경', `${selectedTaskIds.length}건 상태 변경`); showToast(`${selectedTaskIds.length}건 처리 완료`); setSelectedTaskIds([]);
+  };
+  const handleBulkArchive = () => {
+    if (selectedTaskIds.length === 0) return;
+    openConfirm('일괄 보관', `선택한 ${selectedTaskIds.length}건을 보관함으로 이동하시겠습니까?`, () => {
+      addToHistory(); setTasks(tasks.map(t => selectedTaskIds.includes(t.id) ? { ...t, isArchived: true } : t));
+      addLog('일괄 보관', `${selectedTaskIds.length}건 보관함 이동`); showToast(`${selectedTaskIds.length}건 보관됨`); setSelectedTaskIds([]);
+    });
+  };
+
+  // --- CSV Import/Export ---
+  const exportToCSV = () => {
+    if(!tasks.length) { showToast('내보낼 데이터가 없습니다.', 'error'); return; }
+    let c = "ID,Task,Category,Priority,Status,Start,End,DoneAt,Tags,Notes,Subtasks\n";
+    tasks.forEach(t=> {
+      const subtaskStr = t.subtasks ? t.subtasks.map(s => `${s.text}(${s.targetDate||'-'})`).join('; ') : '';
+      c+=`${t.id},"${t.text.replace(/"/g,'""')}",${t.category},${t.priority},${t.status},${t.startDate},${t.deadline},${t.completedAt||''},"${(t.tags||[]).join(' ')}","${(t.notes || '').replace(/"/g, '""')}","${subtaskStr}"\n`;
+    });
+    const b = new Blob(["\uFEFF"+c], {type:'text/csv;charset=utf-8'});
+    const u = URL.createObjectURL(b); const link = document.createElement("a"); link.href=url; link.download="tasks.csv"; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    showToast('CSV 다운로드 완료');
+  };
+
+  const handleCsvUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target.result;
+      const rows = text.split('\n').slice(1); // 헤더 제외
+      const importedTasks = [];
+      
+      rows.forEach(row => {
+        if (!row.trim()) return;
+        const cols = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+        if (cols.length >= 2) {
+           const clean = (str) => str ? str.replace(/^"|"$/g, '').replace(/""/g, '"') : '';
+           const task = {
+             id: Date.now() + Math.random(),
+             text: clean(cols[1]),
+             category: clean(cols[2]) || '기타',
+             priority: clean(cols[3]) || 'medium',
+             status: clean(cols[4]) === 'completed' ? 'completed' : 'in_progress',
+             startDate: clean(cols[5]) || getTodayString(),
+             deadline: clean(cols[6]) || getTodayString(),
+             completedAt: clean(cols[7]) || null,
+             tags: clean(cols[8]) ? clean(cols[8]).split(' ') : [],
+             notes: clean(cols[9]) || '',
+             subtasks: [],
+             comments: [],
+             isArchived: false,
+             recurrence: 'none'
+           };
+           importedTasks.push(task);
+        }
+      });
+      
+      if (importedTasks.length > 0) {
+        openConfirm('CSV 가져오기', `${importedTasks.length}건의 데이터를 가져왔습니다. 추가하시겠습니까?`, () => {
+           addToHistory();
+           setTasks(prev => [...importedTasks, ...prev]);
+           showToast(`${importedTasks.length}건 가져오기 성공`);
+           addLog('데이터 가져오기', 'CSV 파일 병합');
+        });
+      } else {
+        showToast('유효한 데이터가 없습니다.', 'error');
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  };
+
+  // --- Handlers ---
+  const handleAddTag = () => { if (newTag.trim() && !tags.includes(newTag.trim())) { setTags([...tags, newTag.trim()]); } setNewTag(''); };
+  const removeTag = (tag) => { setTags(tags.filter(t => t !== tag)); };
+  const handleAddEditTag = () => { if (editTagAddInput.trim() && !editForm.tags?.includes(editTagAddInput.trim())) { setEditForm({...editForm, tags: [...(editForm.tags||[]), editTagAddInput.trim()]}); } setEditTagAddInput(''); };
+  const removeEditTag = (tag) => { setEditForm({...editForm, tags: (editForm.tags || []).filter(t => t !== tag)}); };
+  const handleAddCategory = () => { if (newCategory.trim() && !categories.includes(newCategory)) { setCategories([...categories, newCategory]); setNewCategory(''); addLog('설정', `카테고리 추가: ${newCategory}`); showToast('카테고리 추가됨'); } };
+  const handleDeleteCategory = (cat) => { if (categories.length > 1) { setCategories(categories.filter(c => c !== cat)); addLog('설정', `카테고리 삭제: ${cat}`); showToast('카테고리 삭제됨'); } else showToast('최소 1개 필요', 'error'); };
+  const handleFactoryReset = () => { openConfirm('시스템 초기화', '모든 데이터가 삭제됩니다. 계속하시겠습니까?', () => { addToHistory(); setTasks([]); setLogs([]); setCategories(defaultCategories); showToast('초기화됨'); }); };
+  const duplicateTask = (task) => { addToHistory(); const clonedTask = { ...task, id: Date.now(), text: `${task.text} (복사본)`, status: 'in_progress', completedAt: null, isArchived: false, subtasks: task.subtasks ? task.subtasks.map(s => ({...s, done: false})) : [], comments: [] }; setTasks([clonedTask, ...tasks]); addLog('복제', task.text); showToast('복제됨'); };
+  const toggleArchive = (id) => { addToHistory(); setTasks(tasks.map(t => t.id === id ? { ...t, isArchived: !t.isArchived } : t)); showToast('보관 상태 변경'); };
+  
+  const addTask = (e) => {
+    e.preventDefault();
+    if (!newTask.trim()) { showToast('내용 입력 필요', 'error'); return; }
+    addToHistory();
+    const baseId = Date.now();
+    let autoSubtasks = getAutoSubtasks(category, baseId);
+    if (newSubtaskText.trim()) { autoSubtasks = [{ id: baseId + 999, text: newSubtaskText, done: false, targetDate: editTagInput }, ...autoSubtasks]; }
+    const task = { id: baseId, text: newTask, category, priority, status: 'in_progress', startDate: startDate || getTodayString(), deadline: deadline || getTodayString(), completedAt: null, subtasks: autoSubtasks, comments: [], tags: tags, notes: notes, isArchived: false, recurrence: recurrence };
+    setTasks([task, ...tasks]); addLog('생성', newTask); showToast('등록 완료');
+    setNewTask(''); setStartDate(getTodayString()); setDeadline(''); setNotes(''); setTags([]); setNewSubtaskText(''); setEditTagInput('');
+  };
+
+  const startEdit = (task) => { setEditingId(task.id); setEditForm({ ...task }); setEditSubtaskText(''); setEditCommentText(''); setEditTagAddInput(''); };
+  const cancelEdit = () => { setEditingId(null); setEditForm({}); };
+  const saveEdit = () => { addToHistory(); setTasks(tasks.map(t => t.id === editingId ? editForm : t)); addLog('수정', editForm.text); showToast('수정 완료'); setEditingId(null); };
+  const addSubtaskToEdit = () => { if(editSubtaskText.trim()){ setEditForm({...editForm, subtasks: [...(editForm.subtasks||[]), {id:Date.now(), text:editSubtaskText, done:false, targetDate: editTagInput}]}); setEditSubtaskText(''); } };
+  const removeSubtaskFromEdit = (sid) => { setEditForm({...editForm, subtasks: editForm.subtasks.filter(s=>s.id!==sid)}); };
+  const toggleSubtaskFromEdit = (sid) => { setEditForm({...editForm, subtasks: editForm.subtasks.map(s=>s.id===sid?{...s,done:!s.done}:s)}); };
+  const addCommentToEdit = () => { if(editCommentText.trim()){ setEditForm({...editForm, comments: [...(editForm.comments||[]), {id:Date.now(), author:'관리자', text:editCommentText, date:new Date().toLocaleString()}]}); setEditCommentText(''); } };
+  const deleteTask = (id) => { openConfirm('삭제', '영구 삭제하시겠습니까?', () => { addToHistory(); setTasks(tasks.filter(t=>t.id!==id)); addLog('삭제', '업무 삭제'); showToast('삭제 완료'); }); };
+  const clearCompleted = () => { const cnt = tasks.filter(t=>t.status==='completed' && !t.isArchived).length; if(cnt===0) return; openConfirm('정리', '완료된 업무를 보관함으로 이동합니까?', () => { addToHistory(); setTasks(tasks.map(t=>t.status==='completed'?{...t, isArchived:true}:t)); showToast('보관 완료'); }); };
+  const loadTemplate = (tmpl) => { setNewTask(tmpl.text); setCategory(tmpl.category); setPriority(tmpl.priority); setStartDate(getTodayString()); setDatePreset('week'); setShowTemplates(false); showToast('템플릿 로드'); };
+  const saveAsTemplate = () => { if(!newTask) return; let t='새 템플릿'; try{t=prompt('템플릿명')||t}catch(e){} setTemplates([...templates, {id:Date.now(), title:t, text:newTask, category, priority, subtasks:[]}]); showToast('저장됨'); };
+
+  // Generate Report
+  const generateWeeklyReport = () => {
+    const today = new Date();
+    const day = today.getDay();
+    const diffToMon = today.getDate() - day + (day === 0 ? -6 : 1);
+    const thisMon = new Date(today); thisMon.setDate(diffToMon); thisMon.setHours(0,0,0,0);
+    const thisSun = new Date(thisMon); thisSun.setDate(thisMon.getDate() + 6); thisSun.setHours(23,59,59,999);
+    const nextMon = new Date(thisMon); nextMon.setDate(thisMon.getDate() + 7);
+    const nextSun = new Date(nextMon); nextSun.setDate(nextMon.getDate() + 6); nextSun.setHours(23,59,59,999);
+    const completedThisWeek = tasks.filter(t => t.status === 'completed' && t.completedAt && new Date(t.completedAt) >= thisMon && new Date(t.completedAt) <= thisSun && !t.isArchived);
+    const plannedNextWeek = tasks.filter(t => t.status !== 'completed' && !t.isArchived && new Date(t.deadline) >= nextMon && new Date(t.deadline) <= nextSun);
+    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    let txt = `[주간 업무 보고]\n작성일: ${fmt(today)}\n기준: 금주(${fmt(thisMon)}~${fmt(thisSun)}) / 차주(${fmt(nextMon)}~${fmt(nextSun)})\n\n■ 금주 실적 (${completedThisWeek.length}건)\n`;
+    if(!completedThisWeek.length) txt+="- 실적 없음\n"; else completedThisWeek.forEach(t=>txt+=`- [완료] ${t.text} (${t.category})\n`);
+    txt+=`\n■ 차주 계획 (${plannedNextWeek.length}건)\n`;
+    if(!plannedNextWeek.length) txt+="- 계획 없음\n"; else plannedNextWeek.forEach(t=>txt+=`- [예정] ${t.text} (~${t.deadline})\n`);
+    return txt;
+  };
+  const copyReportToClipboard = () => { navigator.clipboard.writeText(generateWeeklyReport()).then(()=>showToast('복사 완료')); setShowReportModal(false); };
+
+  // Filter & Stats
+  const processedTasks = useMemo(() => {
+    return tasks.filter(t => {
+      if (showArchived) return t.isArchived;
+      if (!showArchived && t.isArchived) return false;
+      if (filter !== 'all' && t.status !== filter) return false;
+      if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
+      if (dateRangeFilter.start && t.deadline < dateRangeFilter.start) return false;
+      if (dateRangeFilter.end && t.deadline > dateRangeFilter.end) return false;
+      if (searchTerm) {
+         const lower = searchTerm.toLowerCase();
+         return t.text.toLowerCase().includes(lower) || t.notes?.toLowerCase().includes(lower) || t.tags.some(tg=>tg.toLowerCase().includes(lower));
+      }
+      return true;
+    }).sort((a,b) => {
+       if(a.status === 'completed' && b.status !== 'completed') return 1;
+       if(a.status !== 'completed' && b.status === 'completed') return -1;
+       if(a.priority === 'high' && b.priority !== 'high') return -1;
+       if(a.priority !== 'high' && b.priority === 'high') return 1;
+       return 0;
+    });
+  }, [tasks, filter, priorityFilter, dateRangeFilter, searchTerm, showArchived]);
+
+  const groupedTasks = useMemo(() => {
+    if (groupBy === 'none') return { '전체 업무': processedTasks };
+    return processedTasks.reduce((acc, t) => {
+      let key = t[groupBy];
+      if (groupBy === 'status') key = key === 'in_progress' ? '진행 중' : '완료';
+      if (!acc[key]) acc[key] = []; acc[key].push(t); return acc;
+    }, {});
+  }, [processedTasks, groupBy]);
+
+  const stats = useMemo(() => {
+    const active = tasks.filter(t => !t.isArchived);
+    const total = active.length;
+    const completed = active.filter(t => t.status === 'completed').length;
+    const progress = total ? Math.round((completed/total)*100) : 0;
+    const today = new Date().toISOString().split('T')[0];
+    const overdue = active.filter(t => t.status !== 'completed' && t.deadline < today).length;
+    return { total, completed, progress, overdue };
+  }, [tasks]);
+
+  const getDday = (d) => {
+    const today = new Date(); today.setHours(0,0,0,0); const target = new Date(d); target.setHours(0,0,0,0);
+    const diff = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+    if (diff < 0) return `D+${Math.abs(diff)}`; if (diff === 0) return 'D-Day'; return `D-${diff}`;
+  };
+
+  return (
+    <div className={`min-h-screen font-sans transition-colors duration-300 ${ts.bg}`}>
+      
+      {/* Toast */}
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
+        {toasts.map(t => (
+          <div key={t.id} className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right-full ${t.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-indigo-50 border-indigo-200 text-indigo-700'}`}>
+            {t.type === 'error' ? <AlertTriangle className="w-5 h-5"/> : <Check className="w-5 h-5"/>} <span className="text-sm font-bold">{t.message}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Confirmation Modal */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] animate-in fade-in">
+          <div className={`p-6 rounded-xl shadow-2xl w-full max-w-sm ${ts.card}`}>
+            <h3 className="text-lg font-bold mb-2 flex items-center gap-2 text-red-500"><AlertTriangle className="w-6 h-6"/> {confirmDialog.title}</h3>
+            <p className={`text-sm mb-6 ${ts.muted}`}>{confirmDialog.message}</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={closeConfirm} className={`px-4 py-2 rounded-lg font-bold ${ts.buttonSecondary}`}>취소</button>
+              <button onClick={handleConfirmAction} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow-lg">확인</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-[1600px] mx-auto space-y-6 p-2 md:p-8">
+        
+        {/* Header */}
+        <header className={`flex flex-col xl:flex-row justify-between items-start xl:items-center p-6 rounded-xl shadow-sm border gap-4 transition-colors ${ts.header}`}>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className={`text-2xl font-bold flex items-center gap-2 ${theme === 'excel' ? 'text-white' : ''}`}>
+                <Briefcase className="w-6 h-6" /> 업무 관리 (V18.9)
+              </h1>
+              <p className={`text-sm mt-1 ${theme === 'excel' ? 'text-gray-100' : ts.muted}`}>Import/Export & Theme Selection</p>
+            </div>
+            <button onClick={() => setShowDashboard(!showDashboard)} className={`ml-4 p-2 rounded-lg border transition-all ${theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-white/20 hover:bg-white/10'}`}>
+              {showDashboard ? <ChevronUp className="w-5 h-5"/> : <BarChart3 className="w-5 h-5"/>}
+            </button>
+          </div>
+          
+          <div className="flex flex-col md:flex-row gap-4 items-end md:items-center w-full md:w-auto">
+            
+            {/* Design Selector */}
+            <div className={`flex items-center p-1 rounded-lg border ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-200'}`}>
+               <button onClick={() => setTheme('light')} className={`px-3 py-1 text-xs rounded-md ${theme==='light' ? 'bg-indigo-100 text-indigo-700 font-bold' : 'text-slate-500'}`}>Light</button>
+               <button onClick={() => setTheme('dark')} className={`px-3 py-1 text-xs rounded-md ${theme==='dark' ? 'bg-slate-600 text-white font-bold' : 'text-slate-500'}`}>Dark</button>
+               <button onClick={() => setTheme('excel')} className={`px-3 py-1 text-xs rounded-md ${theme==='excel' ? 'bg-green-100 text-green-700 font-bold' : 'text-slate-500'}`}>Excel</button>
+            </div>
+
+            <div className={`flex items-center p-1 rounded-lg border ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-200'}`}>
+              <button onClick={() => setViewMode('kanban')} className={`p-2 rounded-md ${viewMode === 'kanban' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400'}`}><Kanban className="w-4 h-4" /></button>
+              <button onClick={() => setViewMode('card')} className={`p-2 rounded-md ${viewMode === 'card' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400'}`}><LayoutGrid className="w-4 h-4" /></button>
+              <button onClick={() => setViewMode('list')} className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400'}`}><List className="w-4 h-4" /></button>
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={handleUndo} className={`btn-secondary flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium ${ts.buttonSecondary}`} disabled={history.length === 0}><Undo2 className="w-4 h-4" /></button>
+              <button onClick={handleRedo} className={`btn-secondary flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium ${ts.buttonSecondary}`} disabled={future.length === 0}><Redo2 className="w-4 h-4" /></button>
+              <button onClick={() => setShowArchived(!showArchived)} className={`btn-secondary flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium ${ts.buttonSecondary} ${showArchived ? 'text-amber-600 border-amber-200 bg-amber-50' : ''}`}><Archive className="w-4 h-4" /></button>
+              <button onClick={() => setShowLogs(!showLogs)} className={`btn-secondary flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium ${ts.buttonSecondary}`}><History className="w-4 h-4" /></button>
+              <button onClick={() => setShowSettings(!showSettings)} className={`btn-secondary flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium ${ts.buttonSecondary}`}><Settings className="w-4 h-4" /></button>
+              
+              {/* CSV Control Group */}
+              <div className={`flex rounded-lg border overflow-hidden ${theme === 'dark' ? 'border-slate-600' : 'border-slate-200'}`}>
+                 <input type="file" accept=".csv" ref={csvInputRef} className="hidden" onChange={handleCsvUpload} />
+                 <button onClick={() => csvInputRef.current.click()} className={`px-3 py-2 text-xs flex items-center gap-1 border-r ${theme === 'dark' ? 'bg-slate-700 hover:bg-slate-600 border-slate-600 text-white' : 'bg-white hover:bg-gray-50 border-slate-200 text-slate-700'}`} title="CSV 가져오기">
+                   <Upload className="w-3 h-3"/> 가져오기
+                 </button>
+                 <button onClick={exportToCSV} className={`px-3 py-2 text-xs flex items-center gap-1 ${theme === 'dark' ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-800 hover:bg-slate-700 text-white'}`} title="CSV 내보내기">
+                   <Download className="w-3 h-3"/> 내보내기
+                 </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {showReportModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className={`p-6 rounded-xl shadow-xl w-full max-w-2xl ${ts.card}`}>
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><ClipboardList className="w-5 h-5"/> 주간 업무 보고 생성</h3>
+              <div className={`p-4 rounded border font-mono text-xs whitespace-pre-wrap max-h-[60vh] overflow-y-auto mb-4 ${theme === 'dark' ? 'bg-slate-900 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>{generateWeeklyReport()}</div>
+              <div className="flex gap-3"><button onClick={() => setShowReportModal(false)} className={`flex-1 py-2 rounded-lg font-bold ${ts.buttonSecondary}`}>닫기</button><button onClick={copyReportToClipboard} className={`flex-[2] py-2 rounded-lg font-bold flex items-center justify-center gap-2 ${ts.buttonPrimary}`}><Copy className="w-4 h-4"/> 복사</button></div>
+            </div>
+          </div>
+        )}
+
+        {showArchived && <div className="bg-amber-100 border border-amber-200 text-amber-800 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold animate-in fade-in"><Archive className="w-4 h-4"/> 보관함 모드</div>}
+
+        {/* Dashboard */}
+        {showDashboard && !showArchived && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+            <div className={`p-4 rounded-xl border shadow-sm ${ts.card}`}>
+              <div className={`text-xs font-medium mb-1 ${ts.muted}`}>전체 진행률</div>
+              <div className="text-2xl font-bold">{stats.progress}%</div>
+              <div className={`w-full rounded-full h-1 mt-2 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-100'}`}><div className="bg-indigo-600 h-1 rounded-full" style={{ width: `${stats.progress}%` }}></div></div>
+            </div>
+            <div className={`p-4 rounded-xl border shadow-sm ${ts.card}`}>
+               <div className={`text-xs font-medium mb-1 ${ts.muted}`}>진행 중</div>
+               <div className="text-2xl font-bold text-blue-600">{tasks.filter(t=>t.status==='in_progress' && !t.isArchived).length}</div>
+            </div>
+            <div className={`p-4 rounded-xl border shadow-sm ${ts.card}`}>
+               <div className={`text-xs font-medium mb-1 ${ts.muted}`}>지연됨</div>
+               <div className="text-2xl font-bold text-red-600">{stats.overdue}</div>
+            </div>
+            <div className={`p-4 rounded-xl border shadow-sm ${ts.card}`}>
+               <div className={`text-xs font-medium mb-1 ${ts.muted}`}>총 업무</div>
+               <div className="text-2xl font-bold">{stats.total}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Settings Panel */}
+        {showSettings && (
+          <div className={`p-6 rounded-xl border shadow-lg animate-in fade-in ${ts.card}`}>
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Settings className="w-5 h-5"/> 시스템 설정</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <label className={`text-sm font-bold mb-2 block ${ts.muted}`}>카테고리 관리</label>
+                <div className="flex gap-2 mb-3">
+                  <input type="text" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="새 카테고리" className={`flex-1 p-2 border rounded text-sm ${ts.input}`} />
+                  <button onClick={handleAddCategory} className={`px-3 py-2 rounded text-xs font-bold ${ts.buttonPrimary}`}>추가</button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {categories.map(cat => <span key={cat} className={`px-2 py-1 border rounded-full text-xs flex items-center gap-1 ${ts.border} ${theme==='dark'?'bg-slate-700':'bg-slate-50'}`}>{cat}<button onClick={() => handleDeleteCategory(cat)} className="text-slate-400 hover:text-red-500"><X className="w-3 h-3"/></button></span>)}
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className={`p-4 rounded border ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
+                  <p className={`text-sm font-medium mb-2 ${ts.muted}`}>💡 데이터 관리</p>
+                  <button onClick={handleFactoryReset} className="px-3 py-1.5 bg-red-600 text-white text-xs rounded font-bold hover:bg-red-700 flex items-center gap-1"><RefreshCw className="w-3 h-3"/> 시스템 초기화</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {showLogs && (
+          <div className={`p-4 rounded-xl border shadow-inner max-h-60 overflow-y-auto ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+            <h3 className={`text-sm font-bold mb-2 flex items-center gap-2 ${ts.muted}`}><History className="w-4 h-4"/> 최근 활동 로그</h3>
+            <ul className="space-y-2">{logs.map(log => <li key={log.id} className={`text-xs flex gap-2 border-b pb-1 last:border-0 ${ts.border}`}><span className="text-slate-500 font-mono min-w-[120px]">{log.timestamp}</span><span className="font-bold text-indigo-500 min-w-[80px]">{log.action}</span><span className="truncate opacity-70">{log.details}</span></li>)}</ul>
+          </div>
+        )}
+
+        {showTemplates && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className={`p-6 rounded-xl shadow-xl w-full max-w-lg ${ts.card}`}>
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Copy className="w-5 h-5"/> 템플릿 선택</h3>
+              <div className="space-y-3 mb-4 max-h-[60vh] overflow-y-auto">
+                {templates.map(tmpl => (
+                  <div key={tmpl.id} onClick={() => loadTemplate(tmpl)} className={`p-3 border rounded-lg cursor-pointer transition-colors group ${ts.border} hover:bg-opacity-80`}>
+                    <div className="font-bold">{tmpl.title}</div><div className={`text-xs ${ts.muted}`}>{tmpl.category} | {tmpl.priority}</div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setShowTemplates(false)} className={`w-full py-2 rounded-lg font-bold ${ts.buttonSecondary}`}>닫기</button>
+            </div>
+          </div>
+        )}
+
+        {/* Control Tower */}
+        <div className={`p-5 rounded-xl shadow-sm border space-y-4 ${ts.card}`}>
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
+              <input type="text" placeholder="업무명, 태그 검색..." className={`w-full p-2.5 pl-10 border rounded-lg text-sm ${ts.input}`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            </div>
+            
+            <div className="flex gap-2 items-center overflow-x-auto pb-2 md:pb-0">
+              <Filter className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <div className={`h-4 w-px mx-1 ${theme==='dark'?'bg-slate-600':'bg-slate-300'}`}></div>
+              {[{id: 'all', label: '전체'}, {id: 'high', label: '높음'}, {id: 'medium', label: '중간'}, {id: 'low', label: '낮음'}].map(p => (
+                <button key={p.id} onClick={() => setPriorityFilter(p.id)} className={`px-3 py-1.5 text-xs rounded-full border whitespace-nowrap transition-all ${priorityFilter === p.id ? 'bg-indigo-600 text-white border-indigo-600' : ts.buttonSecondary}`}>{p.label}</button>
+              ))}
+              <div className={`flex items-center gap-1 border rounded-full px-2 py-1 ${ts.input}`}>
+                <CalendarRange className="w-3 h-3 text-slate-400"/>
+                <input type="date" value={dateRangeFilter.start} onChange={(e) => setDateRangeFilter({...dateRangeFilter, start: e.target.value})} className="bg-transparent text-xs w-24 focus:outline-none"/>
+                <span className="text-slate-400 text-xs">~</span>
+                <input type="date" value={dateRangeFilter.end} onChange={(e) => setDateRangeFilter({...dateRangeFilter, end: e.target.value})} className="bg-transparent text-xs w-24 focus:outline-none"/>
+                {(dateRangeFilter.start || dateRangeFilter.end) && <button onClick={() => setDateRangeFilter({start:'', end:''})}><X className="w-3 h-3 text-red-400"/></button>}
+              </div>
+            </div>
+          </div>
+
+          {selectedTaskIds.length > 0 && (
+            <div className={`flex items-center gap-3 p-3 rounded-lg animate-in slide-in-from-top-2 ${theme === 'dark' ? 'bg-indigo-900 border-indigo-700' : 'bg-indigo-50 border-indigo-100'}`}>
+              <span className="text-sm font-bold text-indigo-600 flex items-center gap-2"><CheckSquare className="w-4 h-4"/> {selectedTaskIds.length}개</span>
+              <div className="h-4 w-px bg-indigo-200 mx-2"></div>
+              <div className="flex gap-2">
+                <button onClick={() => handleBulkStatusChange('completed')} className={`px-3 py-1 rounded text-xs font-medium ${ts.buttonSecondary}`}>완료</button>
+                <button onClick={handleBulkArchive} className="px-3 py-1 bg-amber-50 border border-amber-200 rounded text-xs font-medium hover:bg-amber-100 text-amber-700">보관</button>
+              </div>
+              <button onClick={() => setSelectedTaskIds([])} className="ml-auto text-xs text-slate-400 hover:text-slate-600">취소</button>
+            </div>
+          )}
+
+          {!showArchived && (
+            <form onSubmit={addTask} className="flex flex-col gap-3">
+              <div className="flex flex-col md:flex-row gap-3">
+                <input type="text" placeholder="신규 업무 명" className={`flex-[2] p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 font-medium ${ts.input}`} value={newTask} onChange={(e) => setNewTask(e.target.value)} />
+                <div className="flex-1">
+                  <select value={category} onChange={(e) => setCategory(e.target.value)} className={`w-full p-2.5 border rounded-lg text-sm ${ts.input}`}>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                </div>
+                <div className="flex gap-2">
+                   <select value={priority} onChange={(e) => setPriority(e.target.value)} className={`p-2.5 border rounded-lg text-sm ${ts.input}`}><option value="high">높음</option><option value="medium">중간</option><option value="low">낮음</option></select>
+                </div>
+              </div>
+              
+              <div className="flex flex-col md:flex-row gap-3">
+                 <div className="flex-1 flex gap-2 items-center">
+                    <span className={`text-xs ${ts.muted}`}>기간:</span>
+                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={`flex-1 p-2.5 border rounded-lg text-sm ${ts.input}`} />
+                    <span className={`text-xs ${ts.muted}`}>~</span>
+                    <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className={`flex-1 p-2.5 border rounded-lg text-sm ${ts.input}`} />
+                    <select value={recurrence} onChange={(e) => setRecurrence(e.target.value)} className={`p-2.5 border rounded-lg text-sm ${ts.input}`} title="반복 설정">
+                      <option value="none">반복 없음</option><option value="daily">매일</option><option value="weekly">매주</option><option value="monthly">매월</option>
+                    </select>
+                 </div>
+                 <div className="flex-1 flex gap-2 items-center">
+                   <div className={`flex-1 flex items-center border rounded-lg px-2 ${ts.input}`}>
+                      <Hash className="w-4 h-4 text-slate-400 mr-1"/>
+                      <input type="text" value={newTag} onChange={(e) => setNewTag(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())} placeholder="태그 입력 (Enter)" className="flex-1 p-2 bg-transparent focus:outline-none text-sm"/>
+                   </div>
+                   <div className="flex flex-wrap gap-1 max-w-[150px] overflow-hidden">
+                      {tags.map(t => <span key={t} onClick={() => removeTag(t)} className={`text-[10px] px-1.5 py-0.5 rounded cursor-pointer bg-indigo-100 text-indigo-700`}>{t} x</span>)}
+                   </div>
+                 </div>
+              </div>
+              
+              <div className="flex flex-col md:flex-row gap-3">
+                 <div className="flex-1 flex gap-2 items-center">
+                    <span className={`text-xs ${ts.muted}`}>세부:</span>
+                    <input type="text" value={newSubtaskText} onChange={(e) => setNewSubtaskText(e.target.value)} placeholder="첫 번째 세부 업무" className={`flex-[2] p-2.5 border rounded-lg text-sm ${ts.input}`} />
+                    <input type="date" value={editTagInput} onChange={(e) => setEditTagInput(e.target.value)} className={`flex-1 p-2.5 border rounded-lg text-sm ${ts.input}`} />
+                 </div>
+                 
+                 <div className="flex justify-end items-center gap-2">
+                   <div className="flex gap-2">
+                     <button type="button" onClick={() => setShowTemplates(true)} className={`px-4 py-2 border rounded-lg text-sm font-medium flex items-center gap-2 ${ts.buttonSecondary}`}><Bookmark className="w-4 h-4"/> 템플릿</button>
+                     <button type="button" onClick={saveAsTemplate} className={`px-4 py-2 border rounded-lg text-sm font-medium flex items-center gap-2 ${ts.buttonSecondary}`}><Copy className="w-4 h-4"/> 저장</button>
+                   </div>
+                   <button type="submit" className={`px-8 py-2 rounded-lg font-bold text-sm shadow-sm whitespace-nowrap flex items-center gap-1 ${ts.buttonPrimary}`}><Plus className="w-5 h-5"/> 등록</button>
+                 </div>
+              </div>
+            </form>
+          )}
+        </div>
+
+        {/* 리스트 필터 */}
+        <div className="flex flex-wrap gap-2 items-center px-1">
+          <BarChart3 className="w-5 h-5 text-slate-500 mr-2" />
+          {[{ id: 'all', label: '전체' }, { id: 'in_progress', label: '진행 중' }, { id: 'completed', label: '완료' }].map((f) => (
+            <button key={f.id} onClick={() => setFilter(f.id)} className={`px-3 py-1.5 text-sm rounded-full border transition-all ${filter === f.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : ts.buttonSecondary}`}>{f.label}</button>
+          ))}
+          <button onClick={() => toggleSelectAll(processedTasks)} className="ml-auto text-xs text-slate-500 hover:text-indigo-600 underline">{selectedTaskIds.length === processedTasks.length && processedTasks.length > 0 ? '전체 해제' : '전체 선택'}</button>
+        </div>
+
+        {/* --- MAIN VIEW (List Only) --- */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 px-2">
+            <Layers className="w-4 h-4 text-slate-500" />
+            <span className={`text-sm font-bold ${ts.muted}`}>그룹화:</span>
+            {['none', 'category', 'status', 'priority'].map(g => (
+               <button key={g} onClick={() => setGroupBy(g)} className={`px-3 py-1 text-xs rounded-full border transition-all ${groupBy === g ? 'bg-slate-700 text-white border-slate-600' : ts.buttonSecondary}`}>{g === 'none' ? '없음' : g === 'category' ? '카테고리' : g === 'status' ? '상태' : '우선순위'}</button>
+            ))}
+          </div>
+          
+          {Object.entries(groupedTasks).map(([groupName, groupTasks]) => (
+            <div key={groupName} className="space-y-2">
+              {groupBy !== 'none' && (
+                <div className="flex items-center gap-2 px-2 pt-2">
+                  <div className={`h-px flex-1 ${theme==='dark'?'bg-slate-700':'bg-slate-300'}`}></div>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{groupName} ({groupTasks.length})</span>
+                  <div className={`h-px flex-1 ${theme==='dark'?'bg-slate-700':'bg-slate-300'}`}></div>
+                </div>
+              )}
+              
+              {groupTasks.length === 0 ? <div className={`text-center py-8 rounded-xl border border-dashed ${ts.card}`}><p className="text-slate-500 font-medium">데이터가 없습니다.</p></div> : 
+                groupTasks.map((task) => (
+                  <div key={task.id} className={`relative group border transition-all duration-200 hover:shadow-md ${task.status==='completed' ? 'opacity-60' : ''} ${ts.card} p-2 rounded-md flex flex-col gap-2 ${selectedTaskIds.includes(task.id) ? 'ring-2 ring-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : ''}`}>
+                    {editingId === task.id ? (
+                      /* 수정 폼 */
+                      <div className={`w-full p-3 rounded border shadow-inner flex flex-col gap-3 ${ts.card}`}>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                           <input type="text" value={editForm.text} onChange={(e) => setEditForm({...editForm, text: e.target.value})} className={`p-2 border rounded font-bold ${ts.input}`} />
+                           <div className="flex gap-2">
+                             <select value={editForm.category} onChange={(e) => setEditForm({...editForm, category: e.target.value})} className={`p-2 border rounded text-sm flex-1 ${ts.input}`}>{categories.map(c=><option key={c} value={c}>{c}</option>)}</select>
+                             <select value={editForm.priority} onChange={(e) => setEditForm({...editForm, priority: e.target.value})} className={`p-2 border rounded text-sm flex-1 ${ts.input}`}><option value="high">높음</option><option value="medium">중간</option><option value="low">낮음</option></select>
+                           </div>
+                         </div>
+                         
+                         <div className="flex items-center gap-2">
+                           <span className={`text-xs ${ts.muted}`}>반복:</span>
+                           <select value={editForm.recurrence || 'none'} onChange={(e) => setEditForm({...editForm, recurrence: e.target.value})} className={`p-1 border rounded text-xs flex-1 ${ts.input}`}>
+                             <option value="none">없음</option><option value="daily">매일</option><option value="weekly">매주</option><option value="monthly">매월</option>
+                           </select>
+                         </div>
+
+                         <div className={`flex gap-2 items-center p-2 rounded ${theme==='dark'?'bg-slate-700':'bg-slate-50'}`}>
+                            <Hash className="w-3 h-3 text-slate-400"/>
+                            <div className="flex flex-wrap gap-1 flex-1">
+                              {editForm.tags && editForm.tags.map(t => <span key={t} onClick={() => removeEditTag(t)} className={`text-[10px] border px-1 rounded cursor-pointer ${ts.buttonSecondary}`}>{t} x</span>)}
+                              <input type="text" value={editTagInput} onChange={(e) => setEditTagInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddEditTag())} placeholder="태그 추가" className="bg-transparent text-xs focus:outline-none min-w-[60px]"/>
+                            </div>
+                         </div>
+                         
+                         <div className={`p-2 rounded ${theme==='dark'?'bg-slate-700':'bg-slate-50'}`}>
+                           <div className="text-xs font-bold mb-1">서브태스크 (내용 / 예정일)</div>
+                           {editForm.subtasks && editForm.subtasks.map(s => (
+                             <div key={s.id} className="flex items-center gap-1 text-xs mb-1">
+                               <input type="checkbox" checked={s.done} onChange={() => toggleSubtaskFromEdit(s.id)}/>
+                               <span className={`flex-1 ${s.done?'line-through':''}`}>{s.text}</span>
+                               <span className="text-[10px] text-slate-400">{s.targetDate}</span>
+                               <button onClick={() => removeSubtaskFromEdit(s.id)} className="text-red-400 ml-1"><X className="w-3 h-3"/></button>
+                             </div>
+                           ))}
+                           <div className="flex gap-1 mt-1">
+                             <input type="text" value={newSubtaskText} onChange={(e)=>setNewSubtaskText(e.target.value)} placeholder="할 일 추가" className={`flex-[2] text-xs border rounded p-1 ${ts.input}`} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSubtaskToEdit())}/>
+                             <input type="date" value={editTagInput} onChange={(e) => setEditTagInput(e.target.value)} className={`flex-1 text-xs border rounded p-1 ${ts.input}`} />
+                             <button onClick={() => { if(newSubtaskText.trim()){ setEditForm({...editForm, subtasks: [...(editForm.subtasks||[]), {id:Date.now(), text:newSubtaskText, done:false, targetDate: editTagInput}]}); setNewSubtaskText(''); setEditTagInput(''); }}} className={`text-xs px-2 rounded ${ts.buttonSecondary}`}>추가</button>
+                           </div>
+                         </div>
+
+                         <div className="flex justify-end gap-2 mt-2">
+                          <button onClick={cancelEdit} className={`px-3 py-1.5 text-sm rounded flex items-center gap-1 ${ts.buttonSecondary}`}><X className="w-4 h-4"/> 취소</button>
+                          <button onClick={saveEdit} className={`px-3 py-1.5 text-sm rounded flex items-center gap-1 ${ts.buttonPrimary}`}><Save className="w-4 h-4"/> 저장</button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* 조회 뷰 */
+                      <>
+                        <div className={`flex items-start gap-4 w-full items-center`}>
+                           <div className="flex items-center gap-2">
+                             <button onClick={() => toggleExpand(task.id)} className={`p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-transform ${expandedTaskIds.includes(task.id) ? 'rotate-90' : ''}`}><ChevronRight className="w-4 h-4 text-slate-500" /></button>
+                             <input type="checkbox" checked={selectedTaskIds.includes(task.id)} onChange={() => toggleSelectTask(task.id)} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
+                           </div>
+                           <div className="flex flex-col gap-2 mt-1 flex-shrink-0">
+                            <button onClick={() => changeStatus(task.id, task.status)} className="transition-colors hover:opacity-80">
+                              {task.status === 'completed' ? <CheckCircle2 className="w-6 h-6 text-indigo-500" /> : <Circle className={`w-6 h-6 ${ts.muted}`} />}
+                            </button>
+                           </div>
+                           <div className="flex-grow min-w-0" onDoubleClick={() => startEdit(task)}>
+                             <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4`}>
+                                <div className="flex items-center gap-2 min-w-[30%]">
+                                  <p className={`text-base font-bold truncate ${task.status === 'completed' ? 'text-slate-400 line-through' : ''}`}>{task.text}</p>
+                                  {task.recurrence !== 'none' && <span className="flex items-center gap-1 text-[10px] text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100"><Repeat className="w-3 h-3"/> {task.recurrence}</span>}
+                                  {task.tags && task.tags.map(t => <span key={t} className={`text-[9px] px-1.5 rounded bg-slate-100 text-slate-500`}>{t}</span>)}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs">
+                                   <span className={`px-2 py-0.5 rounded border font-medium ${task.priority==='high'?'text-red-500 border-red-200 bg-red-50':task.priority==='medium'?'text-amber-500 border-amber-200 bg-amber-50':'text-blue-500 border-blue-200 bg-blue-50'}`}>{task.priority}</span>
+                                   <span className={`px-2 py-0.5 rounded border font-medium ${ts.buttonSecondary}`}>{task.category}</span>
+                                </div>
+                             </div>
+                             <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-xs ${ts.muted} mt-0 ml-auto`}>
+                                <span>{getDday(task.deadline)}</span>
+                                {getNextAction(task) && <span className="flex items-center gap-1 text-indigo-600 font-bold"><Play className="w-3 h-3"/> Next: {getNextAction(task)}</span>}
+                                {task.subtasks && task.subtasks.length > 0 && <span>{task.subtasks.filter(s=>s.done).length}/{task.subtasks.length} sub</span>}
+                                {task.comments && task.comments.length > 0 && <span>{task.comments.length} comment</span>}
+                             </div>
+                           </div>
+                           <div className="flex flex-col gap-1 items-center self-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => startEdit(task)} className="p-2 text-slate-400 hover:text-indigo-600 rounded"><Edit2 className="w-4 h-4" /></button>
+                              <button onClick={() => duplicateTask(task)} className="p-2 text-slate-400 hover:text-indigo-600 rounded" title="복제"><Copy className="w-4 h-4" /></button>
+                              {task.status === 'completed' && !task.isArchived && <button onClick={() => toggleArchive(task.id)} className="p-2 text-slate-400 hover:text-amber-500 rounded" title="보관"><Archive className="w-4 h-4" /></button>}
+                              {task.isArchived && <button onClick={() => toggleArchive(task.id)} className="p-2 text-slate-400 hover:text-green-500 rounded" title="복구"><RefreshCw className="w-4 h-4" /></button>}
+                              <button onClick={() => deleteTask(task.id)} className="p-2 text-slate-400 hover:text-red-600 rounded"><Trash2 className="w-4 h-4" /></button>
+                           </div>
+                        </div>
+
+                        {/* Expanded Subtasks View */}
+                        {expandedTaskIds.includes(task.id) && (
+                          <div className={`ml-10 mt-2 p-3 rounded-lg border-l-4 border-indigo-200 ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                            {task.subtasks && task.subtasks.length > 0 ? (
+                              <div className="space-y-1">
+                                {task.subtasks.map(sub => (
+                                  <div key={sub.id} className="flex items-center gap-2 text-sm justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <div onClick={() => toggleSubtaskDirect(task.id, sub.id)} className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center ${sub.done ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 bg-white'}`}>
+                                        {sub.done && <Check className="w-3 h-3 text-white" />}
+                                      </div>
+                                      <span className={`${sub.done ? 'line-through text-slate-400' : ''}`}>{sub.text}</span>
+                                    </div>
+                                    {sub.targetDate && <span className={`text-xs px-2 py-0.5 rounded ${sub.targetDate === getTodayString() ? 'bg-red-100 text-red-600 font-bold' : 'bg-slate-100 text-slate-500'}`}>{sub.targetDate}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : <div className="text-xs text-slate-400">하위 업무가 없습니다.</div>}
+                            
+                            {task.comments && task.comments.length > 0 && (
+                              <div className="mt-3 pt-2 border-t border-dashed border-slate-300">
+                                <div className="text-xs font-bold text-slate-500 mb-1">최근 댓글</div>
+                                {task.comments.slice(-2).map(c => (
+                                  <div key={c.id} className="text-xs mb-1"><span className="font-bold text-indigo-600">{c.author}:</span> <span>{c.text}</span></div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))
+              }
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
