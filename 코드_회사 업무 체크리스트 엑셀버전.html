@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Business Task Manager V18.9.1</title>
+    <title>송대리의 업무 체크리스트</title>
     
     <!-- 1. 스타일 도구 (Tailwind CSS) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -46,40 +46,30 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
-        // --- 아이콘 컴포넌트 맵퍼 (Lucide) - 수정됨 ---
-        // window.lucide.createElement를 사용하여 SVG를 생성합니다.
+        // --- 아이콘 컴포넌트 맵퍼 (Lucide) ---
         const LucideIcon = ({ name, size = 24, className = "", ...props }) => {
             const iconRef = useRef(null);
             
             useEffect(() => {
-                // lucide가 로드되었는지 확인
                 if (iconRef.current && window.lucide) {
                     const { icons, createElement } = window.lucide;
                     const iconDef = icons[name];
-
                     if (iconDef) {
-                        // SVG 엘리먼트 생성
                         const svg = createElement(iconDef);
-                        
-                        // 속성 적용
                         svg.setAttribute('width', size);
                         svg.setAttribute('height', size);
                         if (className) svg.setAttribute('class', className);
-                        
-                        // 아이콘 컨테이너 비우고 새 아이콘 추가
                         iconRef.current.innerHTML = '';
                         iconRef.current.appendChild(svg);
                     } else {
-                        console.warn(`Icon "${name}" not found in lucide library.`);
+                        console.warn(`Icon "${name}" not found.`);
                     }
                 }
             }, [name, size, className]);
-
-            // props(예: onClick)는 span 래퍼에 적용
             return <span ref={iconRef} style={{ display: 'inline-flex', verticalAlign: 'middle' }} {...props} />;
         };
 
-        // 코드에서 사용된 아이콘들을 미리 정의합니다.
+        // 아이콘 정의
         const CheckCircle2 = (p) => <LucideIcon name="CheckCircle2" {...p} />;
         const Circle = (p) => <LucideIcon name="Circle" {...p} />;
         const Plus = (p) => <LucideIcon name="Plus" {...p} />;
@@ -132,20 +122,16 @@
         const Grid = (p) => <LucideIcon name="Grid" {...p} />;
         const Upload = (p) => <LucideIcon name="Upload" {...p} />;
         const FileCode = (p) => <LucideIcon name="FileCode" {...p} />;
-        const Flag = (p) => <LucideIcon name="Flag" {...p} />;
-
+        const ArrowUp = (p) => <LucideIcon name="ArrowUp" {...p} />;
+        const ArrowDown = (p) => <LucideIcon name="ArrowDown" {...p} />;
 
         // ----------------------------------------------------------------------
-        // App Component Code Starts Here
+        // App Component
         // ----------------------------------------------------------------------
 
         function App() {
-            // --- 테마 관리 (Light, Dark, Excel) ---
-            const [theme, setTheme] = useState(() => {
-                const saved = localStorage.getItem('businessTasks_theme_v2');
-                return saved || 'light';
-            });
-
+            // --- 테마 관리 ---
+            const [theme, setTheme] = useState(() => localStorage.getItem('businessTasks_theme_v2') || 'light');
             useEffect(() => {
                 localStorage.setItem('businessTasks_theme_v2', theme);
                 const root = document.documentElement;
@@ -154,7 +140,6 @@
                 if (theme === 'excel') root.classList.add('excel-theme');
             }, [theme]);
 
-            // 테마별 스타일 헬퍼
             const getThemeStyles = () => {
                 switch (theme) {
                 case 'dark':
@@ -181,7 +166,7 @@
                     muted: 'text-gray-500',
                     border: 'border-gray-300'
                     };
-                default: // light
+                default:
                     return {
                     bg: 'bg-slate-100 text-slate-800',
                     header: 'bg-white border-slate-200',
@@ -195,10 +180,15 @@
                     };
                 }
             };
-
             const ts = getThemeStyles();
 
-            // --- Toast Notification ---
+            const toggleTheme = () => {
+                if (theme === 'light') setTheme('dark');
+                else if (theme === 'dark') setTheme('excel');
+                else setTheme('light');
+            };
+
+            // --- Toast ---
             const [toasts, setToasts] = useState([]);
             const showToast = (message, type = 'success') => {
                 const id = Date.now();
@@ -206,12 +196,12 @@
                 setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000); 
             };
 
-            // --- Data Management ---
+            // --- Data ---
             const defaultCategories = ['보고', '저장품', '수선유지비', '소모품', '관리전환', '기타'];
             const [categories, setCategories] = useState(() => JSON.parse(localStorage.getItem('businessTasks_categories')) || defaultCategories);
             
             const defaultTemplates = [
-                { id: 't1', title: '월간 비용 품의', text: '[월간] 00월 부서 운영비 품의', category: '소모품', priority: 'high', subtasks: [{text: '영수증 취합', done:false}, {text: 'ERP 입력', done:false}] },
+                { id: 't1', title: '월간 비용 품의', text: '[월간] 00월 부서 운영비 품의', category: '소모품', priority: 'high', subtasks: [{id:1, text: '영수증 취합', done:false}, {id:2, text: 'ERP 입력', done:false}] },
                 { id: 't2', title: '주간 업무 보고', text: '[주간] 00월 0주차 업무 보고', category: '보고', priority: 'medium', subtasks: [] }
             ];
             const [templates, setTemplates] = useState(() => JSON.parse(localStorage.getItem('businessTasks_templates')) || defaultTemplates);
@@ -247,14 +237,13 @@
                 const saved = localStorage.getItem('businessTasks_v18_6'); 
                 return saved ? JSON.parse(saved) : initialTasks;
             });
-
             const [logs, setLogs] = useState(() => JSON.parse(localStorage.getItem('businessTasks_logs')) || []);
-
-            // History Stack
+            
+            // History
             const [history, setHistory] = useState([]);
             const [future, setFuture] = useState([]); 
 
-            // 입력 폼 상태
+            // Form States
             const [newTask, setNewTask] = useState('');
             const [category, setCategory] = useState('보고'); 
             const [priority, setPriority] = useState('medium');
@@ -269,7 +258,7 @@
             const [newSubtaskText, setNewSubtaskText] = useState('');
             const [editTagInput, setEditTagInput] = useState('');
 
-            // UI 제어 상태
+            // UI Control
             const [filter, setFilter] = useState('all');
             const [priorityFilter, setPriorityFilter] = useState('all'); 
             const [dateRangeFilter, setDateRangeFilter] = useState({ start: '', end: '' });
@@ -305,7 +294,7 @@
             useEffect(() => { localStorage.setItem('businessTasks_logs', JSON.stringify(logs)); }, [logs]);
             useEffect(() => { localStorage.setItem('businessTasks_templates', JSON.stringify(templates)); }, [templates]);
 
-            // --- 당일 알림 로직 ---
+            // Notifications
             useEffect(() => {
                 const today = getTodayString();
                 let alertCount = 0;
@@ -323,11 +312,7 @@
 
             useEffect(() => { if (errorMsg) { const t = setTimeout(() => setErrorMsg(''), 3000); return () => clearTimeout(t); } }, [errorMsg]);
 
-            const addLog = (action, details) => {
-                setLogs(prev => [{id: Date.now(), timestamp: new Date().toLocaleString(), action, details}, ...prev].slice(0, 50)); 
-            };
-
-            // --- Undo/Redo Logic ---
+            const addLog = (action, details) => setLogs(prev => [{id: Date.now(), timestamp: new Date().toLocaleString(), action, details}, ...prev].slice(0, 50));
             const addToHistory = () => { setHistory(prev => { const newHistory = [...prev, tasks]; return newHistory.slice(-20); }); setFuture([]); };
 
             const handleUndo = useCallback(() => {
@@ -349,17 +334,14 @@
                 window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown);
             }, [handleUndo, handleRedo]);
 
-            // --- Confirmation Helper ---
             const openConfirm = (title, message, onConfirmAction) => { setConfirmDialog({ isOpen: true, title, message, onConfirm: onConfirmAction }); };
             const closeConfirm = () => { setConfirmDialog({ isOpen: false, title: '', message: '', onConfirm: null }); };
             const handleConfirmAction = () => { if (confirmDialog.onConfirm) confirmDialog.onConfirm(); closeConfirm(); };
 
-            // --- Helper: Next Action Text ---
             const getNextAction = (task) => {
                 if (!task.subtasks || task.subtasks.length === 0) return null;
                 const nextSub = task.subtasks.find(s => !s.done);
                 if (!nextSub) return "모든 하위 업무 완료";
-                
                 if (nextSub.targetDate) {
                 const today = getTodayString();
                 const dateLabel = nextSub.targetDate === today ? '오늘' : nextSub.targetDate.substring(5); 
@@ -388,9 +370,9 @@
             };
             const getAutoSubtasks = (cat, baseId) => {
                 if (['저장품', '수선유지비', '소모품'].includes(cat)) {
-                return [{id:baseId+1, text:'계획보고', done:false, targetDate:''}, {id:baseId+2, text:'물품입고', done:false, targetDate:''}, {id:baseId+3, text:'검수및완료', done:false, targetDate:''}, {id:baseId+4, text:'대금지급', done:false, targetDate:''}];
+                    return [{id:baseId+1, text:'계획보고', done:false, targetDate:''}, {id:baseId+2, text:'물품입고', done:false, targetDate:''}, {id:baseId+3, text:'검수및완료', done:false, targetDate:''}, {id:baseId+4, text:'대금지급', done:false, targetDate:''}];
                 } else if (cat === '관리전환') {
-                return [{id:baseId+1, text:'내용공유', done:false, targetDate:''}, {id:baseId+2, text:'물품입고', done:false, targetDate:''}];
+                    return [{id:baseId+1, text:'내용공유', done:false, targetDate:''}, {id:baseId+2, text:'물품입고', done:false, targetDate:''}];
                 }
                 return [];
             };
@@ -411,8 +393,8 @@
                 let newTasks = tasks.map(t => t.id === id ? { ...t, status: nextStatus, completedAt: nextStatus === 'completed' ? nowStr : null } : t);
                 const targetTask = tasks.find(t => t.id === id);
                 if (nextStatus === 'completed' && targetTask && targetTask.recurrence !== 'none') {
-                const nextTask = createRecurringTask(targetTask);
-                if (nextTask) { newTasks = [nextTask, ...newTasks]; showToast(`반복 업무 생성: ${targetTask.recurrence}`); addLog('자동 생성', `반복 업무 "${nextTask.text}" 생성됨`); }
+                    const nextTask = createRecurringTask(targetTask);
+                    if (nextTask) { newTasks = [nextTask, ...newTasks]; showToast(`반복 업무 생성: ${targetTask.recurrence}`); addLog('자동 생성', `반복 업무 "${nextTask.text}" 생성됨`); }
                 }
                 setTasks(newTasks);
                 addLog('상태 변경', `"${targetTask.text}": ${currentStatus} -> ${nextStatus}`);
@@ -616,16 +598,26 @@
             const duplicateTask = (task) => { addToHistory(); const clonedTask = { ...task, id: Date.now(), text: `${task.text} (복사본)`, status: 'in_progress', completedAt: null, isArchived: false, subtasks: task.subtasks ? task.subtasks.map(s => ({...s, done: false})) : [], comments: [] }; setTasks([clonedTask, ...tasks]); addLog('복제', task.text); showToast('복제됨'); };
             const toggleArchive = (id) => { addToHistory(); setTasks(tasks.map(t => t.id === id ? { ...t, isArchived: !t.isArchived } : t)); showToast('보관 상태 변경'); };
             
+            // New: Delete Template Handler
+            const deleteTemplate = (id) => {
+                openConfirm('템플릿 삭제', '이 템플릿을 삭제하시겠습니까?', () => {
+                    const newTemplates = templates.filter(t => t.id !== id);
+                    setTemplates(newTemplates);
+                    showToast('템플릿이 삭제되었습니다.');
+                    addLog('템플릿 삭제', '템플릿이 삭제됨');
+                });
+            };
+
             const addTask = (e) => {
                 e.preventDefault();
                 if (!newTask.trim()) { showToast('내용 입력 필요', 'error'); return; }
                 addToHistory();
                 const baseId = Date.now();
                 let autoSubtasks = getAutoSubtasks(category, baseId);
-                if (newSubtaskText.trim()) { autoSubtasks = [{ id: baseId + 999, text: newSubtaskText, done: false, targetDate: editTagInput }, ...autoSubtasks]; }
+                // Subtask input removed as requested
                 const task = { id: baseId, text: newTask, category, priority, status: 'in_progress', startDate: startDate || getTodayString(), deadline: deadline || getTodayString(), completedAt: null, subtasks: autoSubtasks, comments: [], tags: tags, notes: notes, isArchived: false, recurrence: recurrence };
                 setTasks([task, ...tasks]); addLog('생성', newTask); showToast('등록 완료');
-                setNewTask(''); setStartDate(getTodayString()); setDeadline(''); setNotes(''); setTags([]); setNewSubtaskText(''); setEditTagInput('');
+                setNewTask(''); setStartDate(getTodayString()); setDeadline(''); setNotes(''); setTags([]); 
             };
 
             const startEdit = (task) => { setEditingId(task.id); setEditForm({ ...task }); setEditSubtaskText(''); setEditCommentText(''); setEditTagAddInput(''); };
@@ -634,33 +626,22 @@
             const addSubtaskToEdit = () => { if(editSubtaskText.trim()){ setEditForm({...editForm, subtasks: [...(editForm.subtasks||[]), {id:Date.now(), text:editSubtaskText, done:false, targetDate: editTagInput}]}); setEditSubtaskText(''); } };
             const removeSubtaskFromEdit = (sid) => { setEditForm({...editForm, subtasks: editForm.subtasks.filter(s=>s.id!==sid)}); };
             const toggleSubtaskFromEdit = (sid) => { setEditForm({...editForm, subtasks: editForm.subtasks.map(s=>s.id===sid?{...s,done:!s.done}:s)}); };
+            const moveSubtask = (subId, direction) => {
+                const subtasks = [...(editForm.subtasks || [])];
+                const index = subtasks.findIndex(s => s.id === subId);
+                if (index < 0) return;
+                const newIndex = index + direction;
+                if (newIndex >= 0 && newIndex < subtasks.length) {
+                    [subtasks[index], subtasks[newIndex]] = [subtasks[newIndex], subtasks[index]];
+                    setEditForm({ ...editForm, subtasks });
+                }
+            };
             const addCommentToEdit = () => { if(editCommentText.trim()){ setEditForm({...editForm, comments: [...(editForm.comments||[]), {id:Date.now(), author:'관리자', text:editCommentText, date:new Date().toLocaleString()}]}); setEditCommentText(''); } };
             const deleteTask = (id) => { openConfirm('삭제', '영구 삭제하시겠습니까?', () => { addToHistory(); setTasks(tasks.filter(t=>t.id!==id)); addLog('삭제', '업무 삭제'); showToast('삭제 완료'); }); };
             const clearCompleted = () => { const cnt = tasks.filter(t=>t.status==='completed' && !t.isArchived).length; if(cnt===0) return; openConfirm('정리', '완료된 업무를 보관함으로 이동합니까?', () => { addToHistory(); setTasks(tasks.map(t=>t.status==='completed'?{...t, isArchived:true}:t)); showToast('보관 완료'); }); };
             const loadTemplate = (tmpl) => { setNewTask(tmpl.text); setCategory(tmpl.category); setPriority(tmpl.priority); setStartDate(getTodayString()); setDatePreset('week'); setShowTemplates(false); showToast('템플릿 로드'); };
             const saveAsTemplate = () => { if(!newTask) return; let t='새 템플릿'; try{t=prompt('템플릿명')||t}catch(e){} setTemplates([...templates, {id:Date.now(), title:t, text:newTask, category, priority, subtasks:[]}]); showToast('저장됨'); };
 
-            // Generate Report
-            const generateWeeklyReport = () => {
-                const today = new Date();
-                const day = today.getDay();
-                const diffToMon = today.getDate() - day + (day === 0 ? -6 : 1);
-                const thisMon = new Date(today); thisMon.setDate(diffToMon); thisMon.setHours(0,0,0,0);
-                const thisSun = new Date(thisMon); thisSun.setDate(thisMon.getDate() + 6); thisSun.setHours(23,59,59,999);
-                const nextMon = new Date(thisMon); nextMon.setDate(thisMon.getDate() + 7);
-                const nextSun = new Date(nextMon); nextSun.setDate(nextMon.getDate() + 6); nextSun.setHours(23,59,59,999);
-                const completedThisWeek = tasks.filter(t => t.status === 'completed' && t.completedAt && new Date(t.completedAt) >= thisMon && new Date(t.completedAt) <= thisSun && !t.isArchived);
-                const plannedNextWeek = tasks.filter(t => t.status !== 'completed' && !t.isArchived && new Date(t.deadline) >= nextMon && new Date(t.deadline) <= nextSun);
-                const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                let txt = `[주간 업무 보고]\n작성일: ${fmt(today)}\n기준: 금주(${fmt(thisMon)}~${fmt(thisSun)}) / 차주(${fmt(nextMon)}~${fmt(nextSun)})\n\n■ 금주 실적 (${completedThisWeek.length}건)\n`;
-                if(!completedThisWeek.length) txt+="- 실적 없음\n"; else completedThisWeek.forEach(t=>txt+=`- [완료] ${t.text} (${t.category})\n`);
-                txt+=`\n■ 차주 계획 (${plannedNextWeek.length}건)\n`;
-                if(!plannedNextWeek.length) txt+="- 계획 없음\n"; else plannedNextWeek.forEach(t=>txt+=`- [예정] ${t.text} (~${t.deadline})\n`);
-                return txt;
-            };
-            const copyReportToClipboard = () => { navigator.clipboard.writeText(generateWeeklyReport()).then(()=>showToast('복사 완료')); setShowReportModal(false); };
-
-            // Filter & Stats
             const processedTasks = useMemo(() => {
                 return tasks.filter(t => {
                 if (showArchived) return t.isArchived;
@@ -669,10 +650,7 @@
                 if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
                 if (dateRangeFilter.start && t.deadline < dateRangeFilter.start) return false;
                 if (dateRangeFilter.end && t.deadline > dateRangeFilter.end) return false;
-                if (searchTerm) {
-                    const lower = searchTerm.toLowerCase();
-                    return t.text.toLowerCase().includes(lower) || t.notes?.toLowerCase().includes(lower) || t.tags.some(tg=>tg.toLowerCase().includes(lower));
-                }
+                if (searchTerm) { const lower = searchTerm.toLowerCase(); return t.text.toLowerCase().includes(lower) || t.notes?.toLowerCase().includes(lower) || t.tags.some(tg=>tg.toLowerCase().includes(lower)); }
                 return true;
                 }).sort((a,b) => {
                 if(a.status === 'completed' && b.status !== 'completed') return 1;
@@ -693,13 +671,35 @@
             }, [processedTasks, groupBy]);
 
             const stats = useMemo(() => {
-                const active = tasks.filter(t => !t.isArchived);
-                const total = active.length;
-                const completed = active.filter(t => t.status === 'completed').length;
+                const activeTasks = tasks.filter(t => !t.isArchived);
+                const total = activeTasks.length;
+                const completed = activeTasks.filter(t => t.status === 'completed').length;
                 const progress = total ? Math.round((completed/total)*100) : 0;
                 const today = new Date().toISOString().split('T')[0];
-                const overdue = active.filter(t => t.status !== 'completed' && t.deadline < today).length;
-                return { total, completed, progress, overdue };
+                const overdue = activeTasks.filter(t => t.status !== 'completed' && t.deadline < today).length;
+                
+                // 월별 데이터 집계 (최근 6개월)
+                const monthlyData = [];
+                for (let i = 5; i >= 0; i--) {
+                    const d = new Date();
+                    d.setMonth(d.getMonth() - i);
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const key = `${yyyy}-${mm}`;
+                    
+                    // tasks 전체(보관함 포함)를 대상으로 해당 월에 완료된 건수 집계
+                    const count = tasks.filter(t => {
+                        if (t.status !== 'completed' || !t.completedAt) return false;
+                        return t.completedAt.startsWith(key);
+                    }).length;
+                    
+                    monthlyData.push({ month: `${Number(mm)}월`, count, key });
+                }
+                
+                // 최대값 계산 (그래프 높이 정규화용)
+                const maxMonthlyCount = Math.max(...monthlyData.map(d => d.count), 1); // 0으로 나누기 방지
+
+                return { total, completed, progress, overdue, monthlyData, maxMonthlyCount };
             }, [tasks]);
 
             const getDday = (d) => {
@@ -707,11 +707,32 @@
                 const diff = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
                 if (diff < 0) return `D+${Math.abs(diff)}`; if (diff === 0) return 'D-Day'; return `D-${diff}`;
             };
+            const getPriorityColor = (p) => {
+                const base = isDarkMode ? 'bg-opacity-20 border-opacity-50' : '';
+                switch(p) {
+                case 'high': return isDarkMode ? `text-red-400 bg-red-900 border-red-800 ${base}` : 'text-red-600 bg-red-50 border-red-200';
+                case 'medium': return isDarkMode ? `text-amber-400 bg-amber-900 border-amber-800 ${base}` : 'text-amber-600 bg-amber-50 border-amber-200';
+                case 'low': return isDarkMode ? `text-blue-400 bg-blue-900 border-blue-800 ${base}` : 'text-blue-600 bg-blue-50 border-blue-200';
+                default: return isDarkMode ? `text-slate-400 bg-slate-800 border-slate-700` : 'text-slate-600 bg-slate-50 border-slate-200';
+                }
+            };
+            const getStatusStyle = (status) => {
+                const darkBase = 'border-slate-700';
+                if (isDarkMode) {
+                if(status==='completed') return `${darkBase} bg-slate-800/50 opacity-60`;
+                return `${darkBase} bg-slate-800`; // in_progress
+                }
+                if(status==='completed') return 'border-slate-100 bg-slate-50 opacity-60';
+                return 'border-slate-200 bg-white'; // in_progress
+            };
+            const getStatusIcon = (status) => {
+                if(status==='completed') return <CheckCircle2 className="w-6 h-6 text-indigo-500" />;
+                return <Circle className="w-6 h-6 text-slate-300 dark:text-slate-600" />;
+            };
 
             return (
                 <div className={`min-h-screen font-sans transition-colors duration-300 ${ts.bg}`}>
                 
-                {/* Toast */}
                 <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 no-print">
                     {toasts.map(t => (
                     <div key={t.id} className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right-full ${t.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-indigo-50 border-indigo-200 text-indigo-700'}`}>
@@ -720,7 +741,6 @@
                     ))}
                 </div>
 
-                {/* Confirmation Modal */}
                 {confirmDialog.isOpen && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] animate-in fade-in no-print">
                     <div className={`p-6 rounded-xl shadow-2xl w-full max-w-sm ${ts.card}`}>
@@ -736,12 +756,11 @@
 
                 <div className="max-w-[1600px] mx-auto space-y-6 p-2 md:p-8">
                     
-                    {/* Header */}
                     <header className={`flex flex-col xl:flex-row justify-between items-start xl:items-center p-6 rounded-xl shadow-sm border gap-4 transition-colors no-print ${ts.header}`}>
                     <div className="flex items-center gap-4">
                         <div>
                         <h1 className={`text-2xl font-bold flex items-center gap-2 ${theme === 'excel' ? 'text-white' : ''}`}>
-                            <Briefcase className="w-6 h-6" /> 업무 관리 (V18.9.1)
+                            <Briefcase className="w-6 h-6" /> 송대리의 업무 체크리스트
                         </h1>
                         <p className={`text-sm mt-1 ${theme === 'excel' ? 'text-gray-100' : ts.muted}`}>Import/Export & Theme Selection</p>
                         </div>
@@ -752,18 +771,13 @@
                     
                     <div className="flex flex-col md:flex-row gap-4 items-end md:items-center w-full md:w-auto">
                         
-                        {/* Design Selector */}
                         <div className={`flex items-center p-1 rounded-lg border ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-200'}`}>
                         <button onClick={() => setTheme('light')} className={`px-3 py-1 text-xs rounded-md ${theme==='light' ? 'bg-indigo-100 text-indigo-700 font-bold' : 'text-slate-500'}`}>Light</button>
                         <button onClick={() => setTheme('dark')} className={`px-3 py-1 text-xs rounded-md ${theme==='dark' ? 'bg-slate-600 text-white font-bold' : 'text-slate-500'}`}>Dark</button>
                         <button onClick={() => setTheme('excel')} className={`px-3 py-1 text-xs rounded-md ${theme==='excel' ? 'bg-green-100 text-green-700 font-bold' : 'text-slate-500'}`}>Excel</button>
                         </div>
 
-                        <div className={`flex items-center p-1 rounded-lg border ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-200'}`}>
-                        <button onClick={() => setViewMode('kanban')} className={`p-2 rounded-md ${viewMode === 'kanban' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400'}`}><Kanban className="w-4 h-4" /></button>
-                        <button onClick={() => setViewMode('card')} className={`p-2 rounded-md ${viewMode === 'card' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400'}`}><LayoutGrid className="w-4 h-4" /></button>
-                        <button onClick={() => setViewMode('list')} className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400'}`}><List className="w-4 h-4" /></button>
-                        </div>
+                        <div className={`p-2 rounded-md bg-white shadow text-indigo-600 dark:bg-slate-600`} style={{display: 'none'}}><List className="w-4 h-4" /></div>
 
                         <div className="flex gap-2">
                         <button onClick={handleUndo} className={`btn-secondary flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium ${ts.buttonSecondary}`} disabled={history.length === 0}><Undo2 className="w-4 h-4" /></button>
@@ -772,7 +786,6 @@
                         <button onClick={() => setShowLogs(!showLogs)} className={`btn-secondary flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium ${ts.buttonSecondary}`}><History className="w-4 h-4" /></button>
                         <button onClick={() => setShowSettings(!showSettings)} className={`btn-secondary flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium ${ts.buttonSecondary}`}><Settings className="w-4 h-4" /></button>
                         
-                        {/* CSV/HTML Control Group */}
                         <div className={`flex rounded-lg border overflow-hidden ${theme === 'dark' ? 'border-slate-600' : 'border-slate-200'}`}>
                             <input type="file" accept=".csv" ref={csvInputRef} className="hidden" onChange={handleCsvUpload} />
                             <button onClick={() => csvInputRef.current.click()} className={`px-3 py-2 text-xs flex items-center gap-1 border-r ${theme === 'dark' ? 'bg-slate-700 hover:bg-slate-600 border-slate-600 text-white' : 'bg-white hover:bg-gray-50 border-slate-200 text-slate-700'}`} title="CSV 가져오기">
@@ -804,11 +817,27 @@
                     {/* Dashboard */}
                     {showDashboard && !showArchived && (
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 animate-in fade-in slide-in-from-top-4 duration-300 no-print">
-                        <div className={`p-4 rounded-xl border shadow-sm ${ts.card}`}>
-                        <div className={`text-xs font-medium mb-1 ${ts.muted}`}>전체 진행률</div>
-                        <div className="text-2xl font-bold">{stats.progress}%</div>
-                        <div className={`w-full rounded-full h-1 mt-2 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-100'}`}><div className="bg-indigo-600 h-1 rounded-full" style={{ width: `${stats.progress}%` }}></div></div>
+                        {/* Dashboard Item 1: Monthly Trend */}
+                        <div className={`p-4 rounded-xl border shadow-sm ${ts.card} col-span-2 md:col-span-1`}>
+                            <div className={`text-xs font-medium mb-2 ${ts.muted} flex justify-between`}>
+                                <span>월별 완료 실적 (최근 6개월)</span>
+                                <span className="font-bold">{stats.progress}% 완료</span>
+                            </div>
+                            <div className="flex items-end justify-between h-16 gap-1">
+                                {stats.monthlyData.map((d) => {
+                                     const height = stats.maxMonthlyCount > 0 ? (d.count / stats.maxMonthlyCount) * 100 : 0;
+                                     return (
+                                         <div key={d.key} className="flex flex-col items-center w-full group relative">
+                                            {/* Tooltip */}
+                                            <div className="absolute -top-6 text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity bg-black text-white px-1 rounded z-10 whitespace-nowrap">{d.count}건</div>
+                                            <div className={`w-full rounded-t-sm transition-all duration-500 ${theme === 'dark' ? 'bg-indigo-600' : 'bg-indigo-500'}`} style={{ height: `${Math.max(height, 5)}%` }}></div>
+                                            <span className="text-[9px] mt-1 opacity-70">{d.month}</span>
+                                         </div>
+                                     );
+                                })}
+                            </div>
                         </div>
+
                         <div className={`p-4 rounded-xl border shadow-sm ${ts.card}`}>
                         <div className={`text-xs font-medium mb-1 ${ts.muted}`}>진행 중</div>
                         <div className="text-2xl font-bold text-blue-600">{tasks.filter(t=>t.status==='in_progress' && !t.isArchived).length}</div>
@@ -862,8 +891,11 @@
                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Copy className="w-5 h-5"/> 템플릿 선택</h3>
                         <div className="space-y-3 mb-4 max-h-[60vh] overflow-y-auto">
                             {templates.map(tmpl => (
-                            <div key={tmpl.id} onClick={() => loadTemplate(tmpl)} className={`p-3 border rounded-lg cursor-pointer transition-colors group ${ts.border} hover:bg-opacity-80`}>
-                                <div className="font-bold">{tmpl.title}</div><div className={`text-xs ${ts.muted}`}>{tmpl.category} | {tmpl.priority}</div>
+                            <div key={tmpl.id} className={`p-3 border rounded-lg transition-colors group ${ts.border} hover:bg-opacity-80 flex justify-between items-center`}>
+                                <div onClick={() => loadTemplate(tmpl)} className="cursor-pointer flex-1">
+                                    <div className="font-bold">{tmpl.title}</div><div className={`text-xs ${ts.muted}`}>{tmpl.category} | {tmpl.priority}</div>
+                                </div>
+                                <button onClick={(e) => { e.stopPropagation(); deleteTemplate(tmpl.id); }} className="text-slate-400 hover:text-red-500 p-2"><Trash2 className="w-4 h-4"/></button>
                             </div>
                             ))}
                         </div>
@@ -922,14 +954,21 @@
                         
                         <div className="flex flex-col md:flex-row gap-3">
                             <div className="flex-1 flex gap-2 items-center">
-                                <span className={`text-xs ${ts.muted}`}>기간:</span>
+                                <span className={`text-xs font-bold ${ts.muted}`}>시작:</span>
                                 <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={`flex-1 p-2.5 border rounded-lg text-sm ${ts.input}`} />
-                                <span className={`text-xs ${ts.muted}`}>~</span>
+                            </div>
+                             <div className="flex-1 flex gap-2 items-center">
+                                <span className={`text-xs font-bold ${ts.muted}`}>마감:</span>
                                 <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className={`flex-1 p-2.5 border rounded-lg text-sm ${ts.input}`} />
-                                <select value={recurrence} onChange={(e) => setRecurrence(e.target.value)} className={`p-2.5 border rounded-lg text-sm ${ts.input}`} title="반복 설정">
+                            </div>
+                             <div className="flex-1 flex gap-2 items-center">
+                                <select value={recurrence} onChange={(e) => setRecurrence(e.target.value)} className={`w-full p-2.5 border rounded-lg text-sm ${ts.input}`} title="반복 설정">
                                 <option value="none">반복 없음</option><option value="daily">매일</option><option value="weekly">매주</option><option value="monthly">매월</option>
                                 </select>
                             </div>
+                        </div>
+                        
+                        <div className="flex flex-col md:flex-row gap-3">
                             <div className="flex-1 flex gap-2 items-center">
                             <div className={`flex-1 flex items-center border rounded-lg px-2 ${ts.input}`}>
                                 <Hash className="w-4 h-4 text-slate-400 mr-1"/>
@@ -938,14 +977,6 @@
                             <div className="flex flex-wrap gap-1 max-w-[150px] overflow-hidden">
                                 {tags.map(t => <span key={t} onClick={() => removeTag(t)} className={`text-[10px] px-1.5 py-0.5 rounded cursor-pointer bg-indigo-100 text-indigo-700`}>{t} x</span>)}
                             </div>
-                            </div>
-                        </div>
-                        
-                        <div className="flex flex-col md:flex-row gap-3">
-                            <div className="flex-1 flex gap-2 items-center">
-                                <span className={`text-xs ${ts.muted}`}>세부:</span>
-                                <input type="text" value={newSubtaskText} onChange={(e) => setNewSubtaskText(e.target.value)} placeholder="첫 번째 세부 업무" className={`flex-[2] p-2.5 border rounded-lg text-sm ${ts.input}`} />
-                                <input type="date" value={editTagInput} onChange={(e) => setEditTagInput(e.target.value)} className={`flex-1 p-2.5 border rounded-lg text-sm ${ts.input}`} />
                             </div>
                             
                             <div className="flex justify-end items-center gap-2">
@@ -1020,11 +1051,15 @@
                                     
                                     <div className={`p-2 rounded ${theme==='dark'?'bg-slate-700':'bg-slate-50'}`}>
                                     <div className="text-xs font-bold mb-1">서브태스크 (내용 / 예정일)</div>
-                                    {editForm.subtasks && editForm.subtasks.map(s => (
+                                    {editForm.subtasks && editForm.subtasks.map((s, index) => (
                                         <div key={s.id} className="flex items-center gap-1 text-xs mb-1">
                                         <input type="checkbox" checked={s.done} onChange={() => toggleSubtaskFromEdit(s.id)}/>
                                         <span className={`flex-1 ${s.done?'line-through':''}`}>{s.text}</span>
                                         <span className="text-[10px] text-slate-400">{s.targetDate}</span>
+                                        <div className="flex items-center gap-0.5 ml-1">
+                                            <button onClick={() => moveSubtask(s.id, -1)} className="text-slate-400 hover:text-indigo-600 p-0.5" disabled={index === 0} title="위로"><ArrowUp className="w-3 h-3"/></button>
+                                            <button onClick={() => moveSubtask(s.id, 1)} className="text-slate-400 hover:text-indigo-600 p-0.5" disabled={index === editForm.subtasks.length - 1} title="아래로"><ArrowDown className="w-3 h-3"/></button>
+                                        </div>
                                         <button onClick={() => removeSubtaskFromEdit(s.id)} className="text-red-400 ml-1"><X className="w-3 h-3"/></button>
                                         </div>
                                     ))}
