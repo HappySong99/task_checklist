@@ -38,6 +38,10 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
         .dark ::-webkit-scrollbar-thumb { background: #475569; }
         .touch-action-manipulation { touch-action: manipulation; }
+        
+        /* 비율 고정용 스타일 */
+        .ratio-9-16 { max-width: 430px; width: 100%; margin-left: auto; margin-right: auto; }
+        .ratio-4-5 { max-width: 550px; width: 100%; margin-left: auto; margin-right: auto; }
     </style>
 </head>
 <body class="flex justify-center items-center min-h-screen bg-slate-200">
@@ -103,7 +107,9 @@
             Database: (p) => <LucideIcon name="Database" {...p} />,
             RefreshCw: (p) => <LucideIcon name="RefreshCw" {...p} />,
             Pin: (p) => <LucideIcon name="Pin" {...p} />,
-            Tag: (p) => <LucideIcon name="Tag" {...p} />
+            Tag: (p) => <LucideIcon name="Tag" {...p} />,
+            Smartphone: (p) => <LucideIcon name="Smartphone" {...p} />,
+            Maximize: (p) => <LucideIcon name="Maximize" {...p} />
         };
 
         // --- App Component ---
@@ -111,7 +117,7 @@
             const [isLoading, setIsLoading] = useState(true);
             const [isSheetConnected, setIsSheetConnected] = useState(false);
 
-            // Theme
+            // Theme Setting
             const [theme, setTheme] = useState(() => localStorage.getItem('businessTasks_theme_v2') || 'light');
             useEffect(() => {
                 localStorage.setItem('businessTasks_theme_v2', theme);
@@ -120,7 +126,13 @@
                 if (theme === 'dark') root.classList.add('dark');
             }, [theme]);
 
-            const getThemeStyles = () => {
+            // Aspect Ratio Setting
+            const [aspectRatio, setAspectRatio] = useState(() => localStorage.getItem('businessTasks_aspectRatio') || '9:16');
+            useEffect(() => {
+                localStorage.setItem('businessTasks_aspectRatio', aspectRatio);
+            }, [aspectRatio]);
+
+            const ts = useMemo(() => {
                 return theme === 'dark' ? {
                     bg: 'bg-slate-900 text-slate-100',
                     header: 'bg-slate-800 border-b border-slate-700',
@@ -140,10 +152,9 @@
                     accent: 'text-indigo-600',
                     button: 'bg-white text-slate-700 border border-slate-200 active:bg-slate-50'
                 };
-            };
-            const ts = getThemeStyles();
+            }, [theme]);
 
-            // Toast
+            // Toast System
             const [toasts, setToasts] = useState([]);
             const showToast = (message, type = 'success') => {
                 const id = Date.now();
@@ -151,7 +162,7 @@
                 setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000); 
             };
 
-            // Data
+            // Data Logic
             const getTodayString = () => {
                 const now = new Date();
                 const kstOffset = 9 * 60;
@@ -160,8 +171,8 @@
             };
 
             const initialTasks = [
-                { id: 1, text: '3분기 정기 소모품 구매', category: '소모품', priority: 'high', status: 'in_progress', startDate: getTodayString(), deadline: getTodayString(), completedAt: null, tags: [], isPinned: true, subtasks: [{ id: 101, text: '부서별 수요조사', done: true }, { id: 102, text: '견적서 비교', done: false }], comments: [], notes: '팀장님 결재 대기 중', isArchived: false },
-                { id: 2, text: '[주간] 10월 3주차 업무보고 작성', category: '보고', priority: 'medium', status: 'in_progress', startDate: getTodayString(), deadline: getTodayString(), completedAt: null, tags: [], isPinned: false, subtasks: [{ id: 201, text: '주요 이슈 정리', done: false }, { id: 202, text: '차주 계획 수립', done: false }], comments: [], notes: '금요일 오후 4시까지 제출 필요', isArchived: false }
+                { id: 1, text: '3분기 정기 소모품 구매', category: '소모품', priority: 'high', status: 'in_progress', startDate: getTodayString(), deadline: getTodayString(), completedAt: null, tags: [], isPinned: true, subtasks: [], comments: [], notes: '팀장님 결재 대기 중', isArchived: false },
+                { id: 2, text: '[주간] 10월 3주차 업무보고 작성', category: '보고', priority: 'medium', status: 'in_progress', startDate: getTodayString(), deadline: getTodayString(), completedAt: null, tags: [], isPinned: false, subtasks: [], comments: [], notes: '금요일 오후 4시까지 제출 필요', isArchived: false }
             ];
             
             const defaultCategories = ['보고', '저장품', '수선유지비', '소모품', '관리전환', '기타'];
@@ -176,23 +187,21 @@
                 try { return JSON.parse(localStorage.getItem('businessTasks_logs')) || []; } catch { return []; }
             });
 
-            // UI States
-            const [filter, setFilter] = useState('in_progress');
+            // UI Control States
+            const [filter, setFilter] = useState('all');
             const [searchTerm, setSearchTerm] = useState('');
             const [showDashboard, setShowDashboard] = useState(false); 
             const [showArchived, setShowArchived] = useState(false); 
             const [isMenuOpen, setIsMenuOpen] = useState(false);
             const [isModalOpen, setIsModalOpen] = useState(false);
-            const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false); // 카테고리 모달
+            const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false); 
             const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
             
-            // Form & Edit
+            // Form & Edit States
             const [modalMode, setModalMode] = useState('add');
             const [formState, setFormState] = useState({ id: null, text: '', category: '보고', priority: 'medium', startDate: getTodayString(), deadline: '', completedAt: '', notes: '', subtasks: [], isPinned: false });
             const [newSubtaskText, setNewSubtaskText] = useState('');
             const [newCategoryInput, setNewCategoryInput] = useState('');
-
-            // Calendar
             const [calendarDate, setCalendarDate] = useState(new Date());
             const [selectedDate, setSelectedDate] = useState(getTodayString());
 
@@ -204,7 +213,7 @@
 
             const addLog = (action, details) => setLogs(prev => [{id: Date.now(), timestamp: new Date().toLocaleString(), action, details}, ...prev].slice(0, 50));
 
-            // Helpers
+            // --- Helper Functions ---
             const getDdayLabel = (dateStr) => {
                 if (!dateStr) return '';
                 const today = new Date(); today.setHours(0,0,0,0);
@@ -222,7 +231,7 @@
                 return [];
             };
 
-            // Actions
+            // --- Business Logic ---
             const handleSaveTask = () => {
                 if (!formState.text.trim()) { showToast('업무명을 입력하세요', 'error'); return; }
                 if (modalMode === 'add') {
@@ -247,7 +256,12 @@
                 if(e) e.stopPropagation();
                 const nextStatus = currentStatus === 'in_progress' ? 'completed' : 'in_progress';
                 const nowStr = getTodayString();
-                setTasks(tasks.map(t => t.id === id ? { ...t, status: nextStatus, completedAt: nextStatus === 'completed' ? (t.completedAt || nowStr) : null } : t));
+                setTasks(tasks.map(t => {
+                    if (t.id === id) {
+                        return { ...t, status: nextStatus, completedAt: nextStatus === 'completed' ? (t.completedAt || nowStr) : null };
+                    }
+                    return t;
+                }));
                 showToast(nextStatus === 'completed' ? '완료 처리되었습니다' : '진행 중으로 변경되었습니다');
             };
 
@@ -260,13 +274,21 @@
                 setTasks(tasks.map(t => t.id === id ? { ...t, isArchived: !t.isArchived } : t));
                 const task = tasks.find(t => t.id === id);
                 showToast(task.isArchived ? '보관함에서 복구되었습니다' : '보관함으로 이동되었습니다');
-                setIsModalOpen(false);
+                setIsModalOpen(false); 
             };
 
+            // [추가됨] 누락되었던 deleteTask 함수
             const deleteTask = (id) => {
                 setConfirmDialog({
-                    isOpen: true, title: '삭제 확인', message: '이 업무를 영구 삭제하시겠습니까?',
-                    onConfirm: () => { setTasks(tasks.filter(t => t.id !== id)); addLog('삭제', '업무 삭제됨'); showToast('삭제되었습니다'); }
+                    isOpen: true, 
+                    title: '삭제 확인', 
+                    message: '이 업무를 영구 삭제하시겠습니까?',
+                    onConfirm: () => { 
+                        setTasks(prev => prev.filter(t => t.id !== id)); 
+                        addLog('삭제', '업무 삭제됨'); 
+                        showToast('삭제되었습니다'); 
+                        setIsModalOpen(false);
+                    }
                 });
             };
 
@@ -287,7 +309,7 @@
                 let csv = "\uFEFF상태,카테고리,중요도,고정,업무명,시작일,마감일,완료일,세부업무,메모\n";
                 tasks.forEach(t => {
                     const sub = t.subtasks ? t.subtasks.map(s => `${s.done?'[v]':'[ ]'} ${s.text}`).join('; ') : '';
-                    const row = [t.status==='in_progress'?'진행중':'완료', t.category, t.priority, t.isPinned?'Y':'N', `"${(t.text||'').replace(/"/g,'""')}"`, t.startDate, t.deadline, t.completedAt, `"${sub.replace(/"/g,'""')}"`, `"${(t.notes||'').replace(/"/g,'""')}"`];
+                    const row = [t.status==='in_progress'?'진행중':'완료', t.category, t.priority, t.isPinned?'Y':'N', `"${(t.text||'').replace(/"/g,'""')}"`, t.startDate || '', t.deadline || '', t.completedAt || '', `"${sub.replace(/"/g,'""')}"`, `"${(t.notes||'').replace(/"/g,'""')}"`];
                     csv += row.join(",") + "\n";
                 });
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -302,18 +324,20 @@
                     isOpen: true, title: '데이터 초기화', message: '모든 업무와 설정이 초기화됩니다. 계속하시겠습니까?',
                     onConfirm: () => {
                         setTasks([]); setLogs([]); setCategories(defaultCategories);
-                        localStorage.removeItem('businessTasks_v18_6'); localStorage.removeItem('businessTasks_categories'); localStorage.removeItem('businessTasks_logs');
-                        showToast('초기화되었습니다'); setIsMenuOpen(false);
+                        localStorage.clear();
+                        window.location.reload();
                     }
                 });
             };
 
+            // --- Stats & Sorting ---
             const stats = useMemo(() => {
                 const active = tasks.filter(t => !t.isArchived);
                 const total = active.length;
                 const completed = active.filter(t => t.status === 'completed').length;
+                const progress = total ? Math.round((completed/total)*100) : 0;
                 const overdue = active.filter(t => t.status !== 'completed' && t.deadline && t.deadline < getTodayString()).length;
-                return { total, completed, progress: total ? Math.round((completed/total)*100) : 0, overdue };
+                return { total, completed, progress, overdue, inProgress: total - completed };
             }, [tasks]);
 
             const processedTasks = useMemo(() => {
@@ -330,8 +354,8 @@
                 if (filter === 'completed') targetTasks = targetTasks.filter(t => t.status === 'completed');
                 
                 if (searchTerm) {
-                    const lower = searchTerm.toLowerCase();
-                    targetTasks = targetTasks.filter(t => t.text.toLowerCase().includes(lower) || t.notes?.toLowerCase().includes(lower));
+                    const lower = (searchTerm || '').toLowerCase();
+                    targetTasks = targetTasks.filter(t => (t.text || '').toLowerCase().includes(lower) || (t.notes || '').toLowerCase().includes(lower));
                 }
 
                 return targetTasks.sort((a,b) => {
@@ -342,7 +366,7 @@
                 });
             }, [tasks, filter, searchTerm, showArchived, selectedDate]);
 
-            // Calendar
+            // --- Calendar Logic ---
             const renderCalendar = () => {
                 const year = calendarDate.getFullYear();
                 const month = calendarDate.getMonth();
@@ -386,7 +410,7 @@
             if (isLoading) return <div className="flex items-center justify-center h-screen bg-slate-100"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>;
 
             return (
-                <div className={`w-full max-w-md h-[100dvh] flex flex-col relative shadow-2xl overflow-hidden ${ts.bg}`}>
+                <div className={`${aspectRatio === '9:16' ? 'ratio-9-16' : 'ratio-4-5'} h-[100dvh] flex flex-col relative shadow-2xl overflow-hidden ${ts.bg} transition-all duration-300`}>
                     
                     {/* Header */}
                     <header className={`flex items-center justify-between px-4 py-3 z-10 ${ts.header}`}>
@@ -400,47 +424,54 @@
                         </div>
                     </header>
 
-                    {/* Content Area */}
+                    {/* Main Area */}
                     <div className="flex-1 overflow-y-auto px-4 pb-24 space-y-3 scroll-smooth">
-                        
-                        {/* Search & Dashboard */}
                         <div className="py-2 space-y-2 sticky top-0 z-10 bg-inherit pb-4">
                             <div className={`flex items-center px-3 py-2 rounded-lg border ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                                 <Icons.Search className="w-4 h-4 text-slate-400 mr-2" />
-                                <input type="text" placeholder="검색..." className="bg-transparent text-sm w-full focus:outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                <input type="text" placeholder="검색..." className="bg-transparent text-sm w-full focus:outline-none" value={searchTerm || ''} onChange={(e) => setSearchTerm(e.target.value)} />
                                 {searchTerm && <button onClick={()=>setSearchTerm('')}><Icons.X className="w-4 h-4 text-slate-400"/></button>}
                             </div>
+                            
                             {showDashboard && (
                                 <div className="grid grid-cols-2 gap-2 animate-in slide-in-from-top-2 fade-in duration-200">
-                                    <div className={`p-3 rounded-lg border ${ts.card} flex flex-col items-center justify-center`}><span className={`text-xs ${ts.subtext}`}>진행률</span><span className="text-xl font-bold text-indigo-600">{stats.progress}%</span></div>
-                                    <div className={`p-3 rounded-lg border ${ts.card} flex flex-col items-center justify-center`}><span className={`text-xs ${ts.subtext}`}>지연</span><span className={`text-xl font-bold ${stats.overdue > 0 ? 'text-red-500' : 'text-slate-600'}`}>{stats.overdue}</span></div>
-                                    <div className={`p-3 rounded-lg border ${ts.card} flex flex-col items-center justify-center`}><span className={`text-xs ${ts.subtext}`}>진행중</span><span className="text-xl font-bold text-blue-500">{stats.total - stats.completed}</span></div>
-                                    <div className={`p-3 rounded-lg border ${ts.card} flex flex-col items-center justify-center`}><span className={`text-xs ${ts.subtext}`}>완료</span><span className="text-xl font-bold text-emerald-500">{stats.completed}</span></div>
+                                    <div className={`p-3 rounded-lg border ${ts.card} flex flex-col items-center justify-center`}>
+                                        <span className={`text-[10px] uppercase font-bold ${ts.subtext}`}>진행률</span>
+                                        <span className="text-lg font-bold text-indigo-600">{stats.progress}%</span>
+                                    </div>
+                                    <div className={`p-3 rounded-lg border ${ts.card} flex flex-col items-center justify-center`}>
+                                        <span className={`text-[10px] uppercase font-bold ${ts.subtext}`}>지연</span>
+                                        <span className={`text-lg font-bold ${stats.overdue > 0 ? 'text-red-500' : 'text-slate-600'}`}>{stats.overdue}</span>
+                                    </div>
+                                    <div className={`p-3 rounded-lg border ${ts.card} flex flex-col items-center justify-center`}>
+                                        <span className={`text-[10px] uppercase font-bold ${ts.subtext}`}>진행중</span>
+                                        <span className="text-lg font-bold text-blue-500">{stats.inProgress}</span>
+                                    </div>
+                                    <div className={`p-3 rounded-lg border ${ts.card} flex flex-col items-center justify-center`}>
+                                        <span className={`text-[10px] uppercase font-bold ${ts.subtext}`}>완료</span>
+                                        <span className="text-lg font-bold text-emerald-500">{stats.completed}</span>
+                                    </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* Calendar View */}
                         {filter === 'calendar' && (
                             <div className={`p-4 rounded-xl border mb-4 animate-in fade-in ${ts.card}`}>
                                 <div className="flex justify-between items-center mb-4">
-                                    <button onClick={() => setCalendarDate(new Date(calendarDate.setMonth(calendarDate.getMonth()-1)))} className="p-1"><Icons.ChevronLeft className="w-5 h-5"/></button>
-                                    <span className="font-bold text-lg">{calendarDate.getFullYear()}. {calendarDate.getMonth()+1}</span>
-                                    <button onClick={() => setCalendarDate(new Date(calendarDate.setMonth(calendarDate.getMonth()+1)))} className="p-1"><Icons.ChevronRight className="w-5 h-5"/></button>
+                                    <button onClick={() => setCalendarDate(new Date(calendarDate.setMonth(calendarDate.getMonth()-1)))}><Icons.ChevronLeft /></button>
+                                    <span className="font-bold">{calendarDate.getFullYear()}. {calendarDate.getMonth()+1}</span>
+                                    <button onClick={() => setCalendarDate(new Date(calendarDate.setMonth(calendarDate.getMonth()+1)))}><Icons.ChevronRight /></button>
                                 </div>
-                                <div className="grid grid-cols-7 gap-1 text-center mb-2 text-xs font-bold text-slate-400">
+                                <div className="grid grid-cols-7 gap-1 text-center mb-2 text-[10px] font-bold text-slate-400">
                                     <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
                                 </div>
-                                <div className="grid grid-cols-7 gap-1">
-                                    {renderCalendar()}
-                                </div>
-                                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                    <p className="text-sm font-bold mb-2 flex items-center gap-2"><Icons.Calendar className="w-4 h-4"/> {selectedDate} 업무</p>
+                                <div className="grid grid-cols-7 gap-1">{renderCalendar()}</div>
+                                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+                                    <p className="text-xs font-bold text-slate-400 flex items-center gap-1"><Icons.Calendar className="w-3 h-3"/> {selectedDate} 업무 현황</p>
                                 </div>
                             </div>
                         )}
 
-                        {/* Task List */}
                         {showArchived && <div className="text-center text-xs py-2 bg-amber-50 text-amber-700 rounded mb-2 border border-amber-200">🗄️ 보관함 모드</div>}
                         
                         {processedTasks.length === 0 ? (
@@ -449,23 +480,38 @@
                             processedTasks.map(task => {
                                 const todayStr = getTodayString();
                                 const isOverdue = task.deadline && task.deadline < todayStr && task.status !== 'completed';
-                                
                                 return (
-                                    <div key={task.id} onClick={() => { setFormState({...task, completedAt: task.completedAt || ''}); setModalMode('edit'); setIsModalOpen(true); }} className={`relative p-3 rounded-xl border transition-all active:scale-[0.99] touch-action-manipulation ${ts.card} ${task.status === 'completed' ? 'opacity-60 grayscale-[0.5]' : ''} ${task.isPinned ? 'border-indigo-300 ring-1 ring-indigo-100 bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}>
+                                    <div key={task.id} onClick={() => { 
+                                        setFormState({
+                                            ...task,
+                                            deadline: task.deadline || '',
+                                            completedAt: task.completedAt || '',
+                                            notes: task.notes || '',
+                                            startDate: task.startDate || getTodayString(),
+                                            subtasks: task.subtasks || []
+                                        }); 
+                                        setModalMode('edit'); 
+                                        setIsModalOpen(true); 
+                                    }} className={`relative p-3 rounded-xl border transition-all active:scale-[0.99] touch-action-manipulation ${ts.card} ${task.status === 'completed' ? 'opacity-60 grayscale-[0.5]' : ''} ${task.isPinned ? 'border-indigo-300 ring-1 ring-indigo-100 bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}>
                                         <div className="flex items-start gap-3">
                                             <button onClick={(e) => changeStatus(task.id, task.status, e)} className={`mt-0.5 flex-shrink-0 ${task.status === 'completed' ? 'text-indigo-500' : 'text-slate-300'}`}>
                                                 {task.status === 'completed' ? <Icons.CheckCircle2 className="w-6 h-6" /> : <Icons.Circle className="w-6 h-6" />}
                                             </button>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-start">
-                                                    <h3 className={`font-bold text-sm truncate pr-2 ${task.status==='completed'?'line-through':''}`}>{task.text}</h3>
+                                                    <div className="flex flex-col">
+                                                        <span className={`w-fit text-[9px] px-1.5 py-0.5 rounded-full font-bold mb-1 ${task.status === 'completed' ? 'bg-slate-200 text-slate-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                                            {task.status === 'completed' ? '완료' : '진행중'}
+                                                        </span>
+                                                        <h3 className={`font-bold text-sm truncate pr-2 ${task.status==='completed'?'line-through':''}`}>{task.text}</h3>
+                                                    </div>
                                                     <div className="flex items-center gap-1.5 flex-shrink-0">
                                                         {showArchived ? (
-                                                            <button onClick={(e) => { e.stopPropagation(); toggleArchive(task.id); }} className="p-1 rounded-full bg-emerald-100 text-emerald-600 flex-shrink-0"><Icons.RefreshCw className="w-4 h-4"/></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); toggleArchive(task.id); }} className="p-1 rounded-full bg-emerald-100 text-emerald-600 flex-shrink-0" title="복구"><Icons.RefreshCw className="w-4 h-4"/></button>
                                                         ) : (
                                                             <>
                                                                 <button onClick={(e) => togglePin(task.id, e)} className={`p-1 rounded-full transition-colors ${task.isPinned ? 'text-indigo-600 bg-indigo-100' : 'text-slate-300 hover:text-slate-500'}`}><Icons.Pin className={`w-3.5 h-3.5 ${task.isPinned ? 'fill-current' : ''}`} /></button>
-                                                                <span className={`w-2 h-2 rounded-full ${task.priority === 'high' ? 'bg-red-500' : task.priority === 'medium' ? 'bg-yellow-400' : 'bg-emerald-500'}`}></span>
+                                                                <span className={`w-2 h-2 rounded-full mt-1.5 ${task.priority === 'high' ? 'bg-red-500' : task.priority === 'medium' ? 'bg-yellow-400' : 'bg-emerald-500'}`}></span>
                                                             </>
                                                         )}
                                                     </div>
@@ -492,33 +538,26 @@
                     </div>
 
                     {/* FAB */}
-                    {filter !== 'calendar' && (
-                        <button onClick={() => { setModalMode('add'); setFormState({ id: null, text: '', category: categories[0]||'기타', priority: 'medium', startDate: getTodayString(), deadline: '', completedAt: '', notes: '', subtasks: [], isPinned: false }); setIsModalOpen(true); }} className="absolute bottom-20 right-4 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-600/30 flex items-center justify-center active:scale-90 transition-transform z-20"><Icons.Plus className="w-8 h-8" /></button>
-                    )}
+                    {filter !== 'calendar' && <button onClick={() => { setModalMode('add'); setFormState({ id: null, text: '', category: categories[0]||'기타', priority: 'medium', startDate: getTodayString(), deadline: '', completedAt: '', notes: '', subtasks: [], isPinned: false }); setIsModalOpen(true); }} className="absolute bottom-20 right-4 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-600/30 flex items-center justify-center active:scale-90 transition-transform z-20"><Icons.Plus className="w-8 h-8" /></button>}
 
                     {/* Bottom Nav */}
                     <nav className={`absolute bottom-0 w-full h-16 flex justify-around items-center px-2 z-10 pb-safe ${ts.nav}`}>
-                        {[{ id: 'in_progress', icon: Icons.Briefcase, label: '진행중' }, { id: 'calendar', icon: Icons.CalendarDays, label: '달력' }, { id: 'completed', icon: Icons.CheckSquare, label: '완료' }, { id: 'all', icon: Icons.LayoutList, label: '전체' }].map(tab => (
+                        {[ { id: 'all', icon: Icons.LayoutList, label: '전체' }, { id: 'in_progress', icon: Icons.Briefcase, label: '진행중' }, { id: 'calendar', icon: Icons.CalendarDays, label: '달력' }, { id: 'completed', icon: Icons.CheckSquare, label: '완료' }].map(tab => (
                             <button key={tab.id} onClick={() => setFilter(tab.id)} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${filter === tab.id ? 'text-indigo-600' : 'text-slate-400'}`}>
                                 <tab.icon className={`w-5 h-5 ${filter === tab.id ? 'stroke-[2.5px]' : ''}`} /><span className="text-[10px] font-medium">{tab.label}</span>
                             </button>
                         ))}
                     </nav>
 
-                    {/* --- Modals --- */}
-                    
-                    {/* Task Add/Edit Modal */}
+                    {/* Modals */}
                     {isModalOpen && (
                         <div className="absolute inset-0 z-50 flex flex-col justify-end bg-black/50 backdrop-blur-sm animate-in fade-in">
                             <div className={`w-full rounded-t-2xl p-5 space-y-4 max-h-[90%] overflow-y-auto animate-in slide-in-from-bottom duration-300 ${ts.bg} shadow-2xl`}>
                                 <div className="flex justify-between items-center mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-lg font-bold">{modalMode === 'add' ? '새 업무' : '업무 수정'}</h2>
-                                        <button onClick={() => setFormState({...formState, isPinned: !formState.isPinned})} className={`p-1.5 rounded-full border ${formState.isPinned ? 'bg-indigo-100 border-indigo-200 text-indigo-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}><Icons.Pin className={`w-4 h-4 ${formState.isPinned ? 'fill-current' : ''}`} /></button>
-                                    </div>
+                                    <div className="flex items-center gap-2"><h2 className="text-lg font-bold">{modalMode === 'add' ? '새 업무' : '업무 수정'}</h2><button onClick={() => setFormState({...formState, isPinned: !formState.isPinned})} className={`p-1.5 rounded-full border ${formState.isPinned ? 'bg-indigo-100 border-indigo-200 text-indigo-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}><Icons.Pin className={`w-4 h-4 ${formState.isPinned ? 'fill-current' : ''}`} /></button></div>
                                     <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"><Icons.X className="w-5 h-5"/></button>
                                 </div>
-                                <input type="text" placeholder="어떤 업무인가요?" value={formState.text} onChange={e => setFormState({...formState, text: e.target.value})} className={`w-full p-3 rounded-xl border text-lg font-bold focus:ring-2 focus:ring-indigo-500 outline-none ${ts.input}`} />
+                                <input type="text" placeholder="업무명" value={formState.text || ''} onChange={e => setFormState({...formState, text: e.target.value})} className={`w-full p-3 rounded-xl border text-lg font-bold focus:ring-2 focus:ring-indigo-500 outline-none ${ts.input}`} />
                                 <div className="flex gap-2">
                                     <select value={formState.category} onChange={e => setFormState({...formState, category: e.target.value})} className={`flex-1 p-2.5 rounded-lg border text-sm appearance-none ${ts.input}`}>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select>
                                     <div className="flex bg-slate-100 rounded-lg p-1 dark:bg-slate-700">
@@ -526,31 +565,31 @@
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    <div className={`flex-1 flex items-center px-3 py-2 rounded-lg border ${ts.input}`}><span className="text-xs text-slate-400 mr-2">시작</span><input type="date" value={formState.startDate} onChange={e => setFormState({...formState, startDate: e.target.value})} className="bg-transparent text-sm w-full outline-none" /></div>
-                                    <div className={`flex-1 flex items-center px-3 py-2 rounded-lg border ${ts.input}`}><span className="text-xs text-slate-400 mr-2">마감</span><input type="date" value={formState.deadline} onChange={e => setFormState({...formState, deadline: e.target.value})} className="bg-transparent text-sm w-full outline-none" /></div>
+                                    <div className={`flex-1 flex items-center px-3 py-2 rounded-lg border ${ts.input}`}><span className="text-xs text-slate-400 mr-2">시작</span><input type="date" value={formState.startDate || ''} onChange={e => setFormState({...formState, startDate: e.target.value})} className="bg-transparent text-sm w-full outline-none" /></div>
+                                    <div className={`flex-1 flex items-center px-3 py-2 rounded-lg border ${ts.input}`}><span className="text-xs text-slate-400 mr-2">마감</span><input type="date" value={formState.deadline || ''} onChange={e => setFormState({...formState, deadline: e.target.value})} className="bg-transparent text-sm w-full outline-none" /></div>
                                 </div>
                                 <div className="flex gap-2">
-                                    <div className={`flex-1 flex items-center px-3 py-2 rounded-lg border ${ts.input}`}><span className="text-xs text-slate-400 mr-2">완료</span><input type="date" value={formState.completedAt} onChange={e => setFormState({...formState, completedAt: e.target.value})} className="bg-transparent text-sm w-full outline-none" placeholder="완료일" /></div>
+                                    <div className={`flex-1 flex items-center px-3 py-2 rounded-lg border ${ts.input}`}><span className="text-xs text-slate-400 mr-2">완료</span><input type="date" value={formState.completedAt || ''} onChange={e => setFormState({...formState, completedAt: e.target.value})} className="bg-transparent text-sm w-full outline-none" placeholder="완료일" /></div>
                                     <div className="flex-1"></div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-500">세부업무</label>
-                                    {formState.subtasks.map((sub, idx) => (
+                                    {(formState.subtasks || []).map((sub, idx) => (
                                         <div key={idx} className="flex items-center gap-2 text-sm">
                                             <button onClick={() => setFormState({...formState, subtasks: formState.subtasks.map((s,i) => i===idx ? {...s, done: !s.done} : s)})} className={`w-4 h-4 border rounded flex items-center justify-center ${sub.done ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300'}`}>{sub.done && <Icons.Check className="w-3 h-3 text-white"/>}</button>
-                                            <input type="text" value={sub.text} onChange={(e) => setFormState({...formState, subtasks: formState.subtasks.map((s,i) => i===idx ? {...s, text: e.target.value} : s)})} className={`flex-1 bg-transparent border-b border-dashed border-slate-300 py-1 outline-none ${sub.done ? 'line-through text-slate-400' : ''}`} />
+                                            <input type="text" value={sub.text || ''} onChange={(e) => setFormState({...formState, subtasks: formState.subtasks.map((s,i) => i===idx ? {...s, text: e.target.value} : s)})} className={`flex-1 bg-transparent border-b border-dashed border-slate-300 py-1 outline-none ${sub.done ? 'line-through text-slate-400' : ''}`} />
                                             <button onClick={() => setFormState({...formState, subtasks: formState.subtasks.filter((_,i) => i!==idx)})}><Icons.X className="w-4 h-4 text-red-400"/></button>
                                         </div>
                                     ))}
                                     <div className="flex gap-2">
-                                        <input type="text" placeholder="세부업무 추가" value={newSubtaskText} onChange={e=>setNewSubtaskText(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setFormState({...formState, subtasks: [...formState.subtasks, {id: Date.now(), text: newSubtaskText, done: false}]}), setNewSubtaskText(''))} className={`flex-1 text-sm px-2 py-1.5 rounded border ${ts.input}`} />
-                                        <button onClick={() => { if(newSubtaskText.trim()) { setFormState({...formState, subtasks: [...formState.subtasks, {id: Date.now(), text: newSubtaskText, done: false}]}); setNewSubtaskText(''); }}} className={`px-3 py-1.5 rounded text-xs font-bold ${ts.button}`}>추가</button>
+                                        <input type="text" placeholder="세부업무 추가" value={newSubtaskText || ''} onChange={e=>setNewSubtaskText(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setFormState({...formState, subtasks: [...(formState.subtasks||[]), {id: Date.now(), text: newSubtaskText, done: false}]}), setNewSubtaskText(''))} className={`flex-1 text-sm px-2 py-1.5 rounded border ${ts.input}`} />
+                                        <button onClick={() => { if((newSubtaskText||'').trim()) { setFormState({...formState, subtasks: [...(formState.subtasks||[]), {id: Date.now(), text: newSubtaskText, done: false}]}); setNewSubtaskText(''); }}} className={`px-3 py-1.5 rounded text-xs font-bold ${ts.button}`}>추가</button>
                                     </div>
                                 </div>
-                                <textarea placeholder="메모..." value={formState.notes} onChange={e => setFormState({...formState, notes: e.target.value})} className={`w-full p-3 rounded-lg border text-sm resize-none h-20 ${ts.input}`}></textarea>
+                                <textarea placeholder="메모" value={formState.notes || ''} onChange={e => setFormState({...formState, notes: e.target.value})} className={`w-full p-3 rounded-lg border text-sm resize-none h-20 ${ts.input}`}></textarea>
                                 <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
                                     {modalMode === 'edit' && (<>
-                                        <button onClick={() => { deleteTask(formState.id); setIsModalOpen(false); }} className="p-3 rounded-xl bg-red-50 text-red-500 hover:bg-red-100"><Icons.Trash2 className="w-5 h-5"/></button>
+                                        <button onClick={() => deleteTask(formState.id)} className="p-3 rounded-xl bg-red-50 text-red-500 hover:bg-red-100"><Icons.Trash2 className="w-5 h-5"/></button>
                                         <button onClick={() => toggleArchive(formState.id)} className={`p-3 rounded-xl ${formState.isArchived ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'} hover:bg-opacity-80`}>{formState.isArchived ? <Icons.RefreshCw className="w-5 h-5"/> : <Icons.Archive className="w-5 h-5"/>}</button>
                                     </>)}
                                     <button onClick={handleSaveTask} className="flex-1 p-3 rounded-xl bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-transform">{modalMode === 'add' ? '등록하기' : '수정 완료'}</button>
@@ -559,28 +598,23 @@
                         </div>
                     )}
 
-                    {/* Category Management Modal (복구 및 z-index 상향) */}
                     {isCategoryModalOpen && (
                         <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in">
                             <div className={`w-full max-w-xs p-5 rounded-2xl shadow-2xl ${ts.bg}`}>
                                 <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">카테고리 관리</h3><button onClick={() => setIsCategoryModalOpen(false)}><Icons.X className="w-5 h-5"/></button></div>
                                 <div className="max-h-60 overflow-y-auto space-y-2 mb-4">
                                     {categories.map(cat => (
-                                        <div key={cat} className="flex justify-between items-center p-2 rounded border bg-slate-50 dark:bg-slate-700 dark:border-slate-600">
-                                            <span className="text-sm font-medium">{cat}</span>
-                                            <button onClick={() => handleDeleteCategory(cat)} className="text-slate-400 hover:text-red-500"><Icons.Trash2 className="w-4 h-4"/></button>
-                                        </div>
+                                        <div key={cat} className="flex justify-between items-center p-2 rounded border bg-slate-50 dark:bg-slate-700 dark:border-slate-600"><span className="text-sm font-medium">{cat}</span><button onClick={() => handleDeleteCategory(cat)} className="text-slate-400 hover:text-red-500"><Icons.Trash2 className="w-4 h-4"/></button></div>
                                     ))}
                                 </div>
                                 <div className="flex gap-2">
-                                    <input type="text" placeholder="새 카테고리" value={newCategoryInput} onChange={e => setNewCategoryInput(e.target.value)} className={`flex-1 p-2 rounded text-sm border outline-none ${ts.input}`} />
+                                    <input type="text" placeholder="새 카테고리" value={newCategoryInput || ''} onChange={e => setNewCategoryInput(e.target.value)} className={`flex-1 p-2 rounded text-sm border outline-none ${ts.input}`} />
                                     <button onClick={handleAddCategory} className={`px-3 py-2 rounded text-sm font-bold ${ts.button}`}>추가</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Menu Overlay */}
                     {isMenuOpen && (
                         <div className="absolute inset-0 z-50 flex justify-end">
                             <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px]" onClick={() => setIsMenuOpen(false)}></div>
@@ -588,16 +622,34 @@
                                 <div className="flex justify-between items-center"><h2 className="font-bold text-lg">메뉴</h2><button onClick={() => setIsMenuOpen(false)}><Icons.X className="w-6 h-6"/></button></div>
                                 <div className="space-y-4">
                                     <div className="space-y-1">
-                                        <p className="text-xs font-bold text-slate-400 mb-2">설정</p>
-                                        <button onClick={() => setIsCategoryModalOpen(true)} className={`w-full flex items-center gap-3 p-3 rounded-xl ${ts.button}`}><Icons.Tag className="w-5 h-5"/><span className="text-sm font-medium">카테고리 편집</span></button>
+                                        <p className="text-xs font-bold text-slate-400 mb-2">화면 설정</p>
                                         <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className={`w-full flex items-center gap-3 p-3 rounded-xl ${ts.button}`}>{theme === 'light' ? <Icons.Moon className="w-5 h-5"/> : <Icons.Sun className="w-5 h-5"/>}<span className="text-sm font-medium">{theme === 'light' ? '다크 모드' : '라이트 모드'}</span></button>
-                                        <button onClick={() => setShowArchived(!showArchived)} className={`w-full flex items-center gap-3 p-3 rounded-xl ${showArchived ? 'bg-amber-100 text-amber-800' : ts.button}`}><Icons.Archive className="w-5 h-5"/><span className="text-sm font-medium">보관함 보기</span></button>
+                                        <div className={`w-full flex p-1 rounded-xl gap-1 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                                            <button onClick={() => setAspectRatio('9:16')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${aspectRatio === '9:16' ? 'bg-white shadow text-indigo-600 dark:bg-slate-600 dark:text-white' : 'text-slate-400'}`}><Icons.Smartphone className="w-3.5 h-3.5" /> 9:16</button>
+                                            <button onClick={() => setAspectRatio('4:5')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${aspectRatio === '4:5' ? 'bg-white shadow text-indigo-600 dark:bg-slate-600 dark:text-white' : 'text-slate-400'}`}><Icons.Maximize className="w-3.5 h-3.5" /> 4:5</button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold text-slate-400 mb-2">기능</p>
+                                        <button onClick={() => { setIsCategoryModalOpen(true); setIsMenuOpen(false); }} className={`w-full flex items-center gap-3 p-3 rounded-xl ${ts.button}`}><Icons.Tag className="w-5 h-5"/><span className="text-sm font-medium">카테고리 편집</span></button>
+                                        <button onClick={() => { setShowArchived(!showArchived); setIsMenuOpen(false); }} className={`w-full flex items-center gap-3 p-3 rounded-xl ${showArchived ? 'bg-amber-100 text-amber-800' : ts.button}`}><Icons.Archive className="w-5 h-5"/><span className="text-sm font-medium">보관함 보기</span></button>
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-xs font-bold text-slate-400 mb-2">데이터</p>
-                                        <button onClick={() => { csvInputRef.current.click(); setIsMenuOpen(false); }} className={`w-full flex items-center gap-3 p-3 rounded-xl ${ts.button}`}><Icons.Upload className="w-5 h-5"/><span className="text-sm font-medium">CSV 불러오기</span></button>
-                                        <input type="file" ref={csvInputRef} className="hidden" accept=".csv" />
-                                        <button onClick={exportToCSV} className={`w-full flex items-center gap-3 p-3 rounded-xl ${ts.button}`}><Icons.Download className="w-5 h-5"/><span className="text-sm font-medium">CSV 내보내기</span></button>
+                                        <button onClick={() => { 
+                                            let csvContent = "\uFEFF상태,카테고리,중요도,고정,업무명,시작일,마감일,완료일,세부업무,메모\n";
+                                            tasks.forEach(task => {
+                                                const subtasksStr = task.subtasks ? task.subtasks.map(s => `${s.done ? '[v]' : '[ ]'} ${s.text}`).join('; ') : '';
+                                                const row = [task.status==='in_progress'?'진행중':'완료', task.category, task.priority, task.isPinned?'Y':'N', `"${(task.text||'').replace(/"/g,'""')}"`, task.startDate || '', task.deadline || '', task.completedAt || '', `"${subtasksStr.replace(/"/g,'""')}"`, `"${(task.notes||'').replace(/"/g,'""')}"` ];
+                                                csvContent += row.join(",") + "\n";
+                                            });
+                                            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                                            const url = URL.createObjectURL(blob);
+                                            const link = document.createElement("a"); link.href = url; link.download = `업무목록_${getTodayString()}.csv`;
+                                            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                                            setIsMenuOpen(false);
+                                            showToast('CSV 파일이 다운로드되었습니다');
+                                        }} className={`w-full flex items-center gap-3 p-3 rounded-xl ${ts.button}`}><Icons.Download className="w-5 h-5"/><span className="text-sm font-medium">CSV 내보내기</span></button>
                                         <button onClick={handleResetData} className={`w-full flex items-center gap-3 p-3 rounded-xl bg-red-50 text-red-500`}><Icons.Trash2 className="w-5 h-5"/><span className="text-sm font-medium">데이터 초기화</span></button>
                                     </div>
                                 </div>
@@ -605,10 +657,9 @@
                         </div>
                     )}
 
-                    {/* Toast & Confirm Dialog */}
                     <div className="absolute top-16 left-0 w-full px-4 flex flex-col gap-2 z-50 pointer-events-none">{toasts.map(t => (<div key={t.id} className={`bg-slate-800/90 text-white px-4 py-3 rounded-xl shadow-lg text-sm font-medium animate-in slide-in-from-top-5 fade-in text-center`}>{t.message}</div>))}</div>
                     {confirmDialog.isOpen && (
-                        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                        <div className="absolute inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
                             <div className={`w-full max-w-sm p-5 rounded-2xl shadow-2xl ${ts.bg} animate-in zoom-in-95`}>
                                 <h3 className="font-bold text-lg mb-2">{confirmDialog.title}</h3><p className="text-sm text-slate-500 mb-6">{confirmDialog.message}</p>
                                 <div className="flex gap-3 justify-end">
